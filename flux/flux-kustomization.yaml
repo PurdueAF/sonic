@@ -12,5 +12,5 @@ spec:
   prune: true
   sourceRef:
     kind: GitRepository
-    name: sonic-git-repos
+    name: sonic-git-repo
   targetNamespace: sonic
