@@ -19,11 +19,11 @@ triton:
 
   resources:
     limits:
-      nvidia.com/gpu: ${sonic_gpus_initial}
+      nvidia.com/gpu: 1
       cpu: 2
       memory: 8G
     requests:
-      nvidia.com/gpu: ${sonic_gpus_initial}
+      nvidia.com/gpu: 1
       cpu: 2
       memory: 8G
   nodeSelector: { "cms-af-prod": "true" }
@@ -57,7 +57,7 @@ envoy:
   service:
     type: LoadBalancer
   ingress:
-    enabled: ${enable_ingresses}
+    enabled: false
     hostName: sonic-cms.geddes.rcac.purdue.edu
     ingressClassName: public
   rate_limiter:
@@ -123,7 +123,7 @@ grafana:
             nodeGraph:
               enabled: true
   ingress:
-    enabled: ${enable_ingresses}
+    enabled: false
     hosts:
       - grafana-cms.geddes.rcac.purdue.edu
     tls:
