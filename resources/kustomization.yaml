@@ -6,7 +6,7 @@ resources:
   - supersonic-interlink/helmrelease.yaml
   - gitrepo.yaml
   - helmrepo.yaml
-  - prometneus-networkpolicy.yaml
+  - prometheus-networkpolicy.yaml
 
 generatorOptions:
   disableNameSuffixHash: true
