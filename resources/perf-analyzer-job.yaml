@@ -2,7 +2,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: perf-analyzer-job
-  namespace: cms
+  namespace: sonic
 spec:
   parallelism: 10
   completions: 10

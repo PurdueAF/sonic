@@ -1,0 +1,15 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: sonic-git-repo
+  namespace: sonic
+  annotations:
+    cluster: geddes
+spec:
+  interval: 30s
+  timeout: 1m
+  url: https://github.com/PurdueAF/sonic.git
+  ref:
+    branch: main
+  secretRef:
+    name: flux-github-token
