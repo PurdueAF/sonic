@@ -97,7 +97,7 @@ prometheus:
 grafana:
   enabled: true
   dashboardsConfigMaps:
-    default: sonic-server-grafana-default-dashboard
+    default: cms-run3-miniaod-grafana-default-dashboard
   datasources:
     datasources.yaml:
       datasources:
@@ -111,7 +111,7 @@ grafana:
             tlsSkipVerify: true
         - name: tempo
           type: tempo
-          url: http://sonic-server-tempo:3100
+          url: http://cms-run3-miniaod-tempo:3100
           access: proxy
           isDefault: false
           basicAuth: false

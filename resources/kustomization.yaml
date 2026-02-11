@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - supersonic/helmrelease.yaml
+  - cms-run3-miniaod/helmrelease.yaml
   - supersonic-dynamic/gitrepo.yaml
   - supersonic-dynamic/helmrelease.yaml
   - supersonic-interlink/helmrelease.yaml
@@ -13,9 +13,9 @@ generatorOptions:
   disableNameSuffixHash: true
 
 configMapGenerator:
-  - name: supersonic-config
+  - name: cms-run3-miniaod-config
     files:
-      - values.yaml=supersonic/values.yaml
+      - values.yaml=cms-run3-miniaod/values.yaml
   - name: supersonic-dynamic-config
     files:
       - values.yaml=supersonic-dynamic/values.yaml
