@@ -25,7 +25,7 @@ spec:
       retries: -1
   valuesFrom:
     - kind: ConfigMap
-      name: supersonic-config
+      name: cms-run3-miniaod-config
       valuesKey: values.yaml
   postRenderers:
     - kustomize:
