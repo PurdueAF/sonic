@@ -94,9 +94,6 @@ prometheus:
     useExistingClusterRoleName: supersonic-prometheus-role
     configMapOverrideName: prometheus-config
 
-    ingress:
-      enabled: false
-
   serviceAccounts:
     server:
       create: false
