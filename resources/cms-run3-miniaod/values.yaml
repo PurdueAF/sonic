@@ -97,7 +97,7 @@ prometheus:
   serviceAccounts:
     server:
       create: false
-      name: supersonic-prometheus-sa 
+      name: cms-run3-miniaod-prometheus-sa
   
 
 grafana:
