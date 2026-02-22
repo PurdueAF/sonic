@@ -88,6 +88,7 @@ ingress:
   enabled: false
 
 prometheus:
+  enabled: true
   server:
     extraFlags: [web.enable-remote-write-receiver]
     useExistingClusterRoleName: supersonic-prometheus-role
