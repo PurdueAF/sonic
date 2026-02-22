@@ -121,7 +121,7 @@ grafana:
           type: prometheus
           access: proxy
           isDefault: true
-          url: http://prometheus-server.cms.svc.cluster.local
+          url: http://cms-run3-miniaod-prometheus-server:9090 
           jsonData:
             timeInterval: "5s"
             tlsSkipVerify: true
