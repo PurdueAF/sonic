@@ -88,11 +88,26 @@ ingress:
   enabled: false
 
 prometheus:
-  external:
-    enabled: true
-    url: prometheus-server.cms.svc.cluster.local
-    port: 9090
-    scheme: http
+  server:
+    extraFlags: [web.enable-remote-write-receiver]
+    useExistingClusterRoleName: supersonic-prometheus-role
+    configMapOverrideName: prometheus-config
+
+    ingress:
+      enabled: true
+      hostName: "prometheus-server.sonic.svc.cluster.local"
+      tls:
+        - hosts:
+            - prometheus-server.sonic.svc.cluster.local
+      ingressClassName: public
+      annotations:
+        metallb.universe.tf/address-pool: geddes-private-pool
+
+  serviceAccounts:
+    server:
+      create: false
+      name: supersonic-prometheus-sa 
+  
 
 grafana:
   enabled: true
