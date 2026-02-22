@@ -2,9 +2,9 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - cms-run3-miniaod/helmrelease.yaml
-  - supersonic-dynamic/gitrepo.yaml
-  - supersonic-dynamic/helmrelease.yaml
-  - supersonic-interlink/helmrelease.yaml
+  # - supersonic-dynamic/gitrepo.yaml
+  # - supersonic-dynamic/helmrelease.yaml
+  # - supersonic-interlink/helmrelease.yaml
   - gitrepo.yaml
   - helmrepo.yaml
   - prometheus-networkpolicy.yaml
@@ -16,9 +16,9 @@ configMapGenerator:
   - name: cms-run3-miniaod-config
     files:
       - values.yaml=cms-run3-miniaod/values.yaml
-  - name: supersonic-dynamic-config
-    files:
-      - values.yaml=supersonic-dynamic/values.yaml
-  - name: supersonic-interlink-config
-    files:
-      - values.yaml=supersonic-interlink/values.yaml
+  # - name: supersonic-dynamic-config
+  #   files:
+  #     - values.yaml=supersonic-dynamic/values.yaml
+  # - name: supersonic-interlink-config
+  #   files:
+  #     - values.yaml=supersonic-interlink/values.yaml
