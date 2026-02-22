@@ -91,7 +91,7 @@ prometheus:
   enabled: true
   server:
     extraFlags: [web.enable-remote-write-receiver]
-    useExistingClusterRoleName: supersonic-prometheus-role
+    useExistingClusterRoleName: cms-run3-miniaod-prometheus-role 
     configMapOverrideName: prometheus-config
 
   serviceAccounts:
