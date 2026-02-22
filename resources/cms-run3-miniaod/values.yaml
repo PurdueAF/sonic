@@ -95,14 +95,7 @@ prometheus:
     configMapOverrideName: prometheus-config
 
     ingress:
-      enabled: true
-      hostName: "prometheus-server.sonic.svc.cluster.local"
-      tls:
-        - hosts:
-            - prometheus-server.sonic.svc.cluster.local
-      ingressClassName: public
-      annotations:
-        metallb.universe.tf/address-pool: geddes-private-pool
+      enabled: false
 
   serviceAccounts:
     server:
