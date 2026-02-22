@@ -125,11 +125,11 @@ grafana:
   ingress:
     enabled: true
     hosts:
-      - grafana-cms.geddes.rcac.purdue.edu
+      - sonic-grafana.geddes.rcac.purdue.edu
     tls:
       - hosts:
-          - grafana-cms.geddes.rcac.purdue.edu
+          - sonic-grafana.geddes.rcac.purdue.edu
     ingressClassName: public
   grafana.ini:
     server:
-      root_url: https://grafana-cms.geddes.rcac.purdue.edu
+      root_url: https://sonic-grafana.geddes.rcac.purdue.edu
