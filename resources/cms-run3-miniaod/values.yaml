@@ -93,13 +93,13 @@ prometheus:
     extraFlags: [web.enable-remote-write-receiver]
     useExistingClusterRoleName: cms-run3-miniaod-prometheus-role 
     configMapOverrideName: prometheus-config
-  service:
-    enabled: true
-    type: LoadBalancer
-    servicePort: 9090
-    annotations:
-      prometheus.io/scrape: "true"
-      prometheus.io/port: "9090"
+    service:
+      enabled: true
+      type: LoadBalancer
+      servicePort: 9090
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
   serviceAccounts:
     server:
       create: false
