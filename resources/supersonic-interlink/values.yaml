@@ -45,7 +45,7 @@ triton:
   #   #   reset: false
   #   initialDelaySeconds: 120
     periodSeconds: 5
-    failureThreshold: 60
+    failureThreshold: 24
     httpGet:
       path: /v2/health/ready
       port: "8000"
