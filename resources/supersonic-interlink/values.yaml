@@ -82,6 +82,6 @@ keda:
 prometheus:
   external:
     enabled: true
-    url: prometheus-server.cms.geddes.rcac.purdue.edu
+    url: cms-run3-miniaod-prometheus-server.sonic.geddes.rcac.purdue.edu
     port: 9090
     scheme: http
