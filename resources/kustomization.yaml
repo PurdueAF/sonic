@@ -19,6 +19,6 @@ configMapGenerator:
   # - name: supersonic-dynamic-config
   #   files:
   #     - values.yaml=supersonic-dynamic/values.yaml
-  # - name: supersonic-interlink-config
-  #   files:
-  #     - values.yaml=supersonic-interlink/values.yaml
+  - name: supersonic-interlink-config
+    files:
+      - values.yaml=supersonic-interlink/values.yaml
