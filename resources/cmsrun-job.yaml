@@ -1,0 +1,55 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cmsrun-job
+spec:
+  parallelism: 10
+  completions: 10
+  template:
+    spec:
+      containers:
+      - name: cmsrun-job
+        image: kondratyevd/sonic-client-cms-miniaod:cmssw_16
+        args:
+          - "--address=sonic-interlink.sonic.geddes.rcac.purdue.edu"
+          - "--port=8001"
+          - "--redir=root://cmsxrootd.fnal.gov/"
+          - "--verboseDiscovery"
+          - "--tries=3"
+        env:
+          - name: X509_USER_PROXY
+            value: /etc/grid-security-ro/x509up
+        volumeMounts:
+          - name: cvmfs
+            mountPath: /cvmfs
+            mountPropagation: HostToContainer
+          - name: x509-proxy
+            mountPath: /etc/grid-security-ro
+            readOnly: true
+        resources:
+          requests:
+            memory: "16Gi"
+            cpu: "4"
+          limits:
+            memory: "16Gi"
+            cpu: "4"
+      restartPolicy: Never
+      volumes:
+        - name: cvmfs
+          persistentVolumeClaim:
+            claimName: cvmfs
+        - name: x509-proxy
+          secret:
+            secretName: x509-proxy
+            defaultMode: 384
+
+      # These selectors are used at Purdue Geddes cluster.
+      nodeSelector:
+        cms-af-prod: 'true'
+      tolerations:
+        - key: "hub.jupyter.org/dedicated"
+          operator: "Equal"
+          value: "cms-af"
+          effect: "NoSchedule"
+
+  backoffLimit: 0
