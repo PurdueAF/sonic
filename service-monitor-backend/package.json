@@ -1,0 +1,14 @@
+{
+  "name": "service-monitor-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Small Node.js wrapper around kubectl to feed the service-monitor dashboard.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node dev.js"
+  },
+  "dependencies": {
+    "express": "^4.19.0"
+  }
+}
+

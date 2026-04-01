@@ -1,0 +1,1965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Kubernetes Service Pod Topology Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+      --color-bg: #f5f5f7;
+      --color-surface: #ffffff;
+      --color-border: #d1d5db;
+      --color-text: #111827;
+      --color-text-muted: #6b7280;
+
+      --color-ready: #1D9E75;
+      --color-notready: #EF9F27;
+      --color-danger: #E24B4A;
+      --color-terminating: #6D28D9;
+      --color-pending: #9ca3af;
+      --color-exposed: #185FA5;
+
+      --color-ready-dark: #9FE1CB;
+      --color-notready-dark: #FAC775;
+      --color-danger-dark: #F09595;
+      --color-terminating-dark: #A855F7;
+      --color-exposed-dark: #85B7EB;
+
+      --color-alert-bg: #FEE2E2;
+      --color-alert-border: #FCA5A5;
+      --color-alert-text: #991B1B;
+
+      --color-badge-bg: #e5e7eb;
+      --color-badge-text: #374151;
+
+      --radius-base: 6px;
+      --radius-pill: 999px;
+
+      --timeline-height: 12px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --color-bg: #020617;
+        --color-surface: #020617;
+        --color-border: #1f2937;
+        --color-text: #e5e7eb;
+        --color-text-muted: #9ca3af;
+
+        --color-ready: var(--color-ready-dark);
+        --color-notready: var(--color-notready-dark);
+        --color-danger: var(--color-danger-dark);
+        --color-pending: #4b5563;
+        --color-exposed: var(--color-exposed-dark);
+
+        --color-alert-bg: #451717;
+        --color-alert-border: #7f1d1d;
+        --color-alert-text: #fecaca;
+
+        --color-badge-bg: #111827;
+        --color-badge-text: #e5e7eb;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      height: 100%;
+    }
+
+    body {
+      margin: 0;
+      padding: 16px;
+      font-family: var(--font-sans);
+      background-color: var(--color-bg);
+      color: var(--color-text);
+    }
+
+    .page {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-height: calc(100vh - 32px);
+    }
+
+    .top-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background-color: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-base);
+      padding: 12px 16px;
+    }
+
+    .top-bar-main {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .service-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--color-border);
+      background-color: var(--color-bg);
+      font-weight: 500;
+    }
+
+    .service-name-input {
+      border: none;
+      padding: 0;
+      margin: 0;
+      background: transparent;
+      font: inherit;
+      min-width: 120px;
+      max-width: 220px;
+      outline: none;
+      color: inherit;
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background-color: var(--color-ready);
+    }
+
+    .dot.danger {
+      background-color: var(--color-danger);
+    }
+
+    .top-bar-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 12px;
+      color: var(--color-text-muted);
+    }
+
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .meta-label {
+      font-weight: 500;
+    }
+
+    .meta-value-warn {
+      color: var(--color-notready);
+    }
+
+    .meta-value-bad {
+      color: var(--color-danger);
+    }
+
+    .meta-value-ok {
+      color: var(--color-ready);
+    }
+
+    .risk-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 8px;
+      border-radius: var(--radius-pill);
+      border: 1px solid rgba(148, 163, 184, 0.45);
+      background: rgba(15, 23, 42, 0.03);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      line-height: 1.4;
+      white-space: nowrap;
+    }
+    .risk-pill-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--color-ready);
+      flex-shrink: 0;
+    }
+    .risk-pill--ok .risk-pill-dot { background: var(--color-ready); }
+    .risk-pill--warn .risk-pill-dot { background: var(--color-notready); }
+    .risk-pill--bad .risk-pill-dot { background: var(--color-danger); }
+
+    .namespace-select {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+    }
+
+    .namespace-select select {
+      font-size: 13px;
+      padding: 3px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--color-border);
+      background-color: var(--color-surface);
+      color: var(--color-text);
+    }
+
+    .timer {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--color-text-muted);
+    }
+
+    .last-sync {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--color-text-muted);
+      text-align: right;
+      max-width: 280px;
+      line-height: 1.35;
+    }
+
+    .last-sync--warn {
+      color: var(--color-notready);
+    }
+
+    .top-bar-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+    }
+
+    /* Alert banner removed; traffic risk is shown inline in the header. */
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .filter-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    button {
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--color-border);
+      padding: 4px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      background-color: var(--color-surface);
+      color: var(--color-text);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    button.active {
+      border-color: var(--color-exposed);
+      color: var(--color-exposed);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    .pods-section {
+      background-color: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-base);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .pods-header {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .pods-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 10px;
+    }
+
+    .pod-card {
+      border-radius: var(--radius-base);
+      border: 1px solid var(--color-border);
+      padding: 8px 10px;
+      font-size: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      cursor: pointer;
+      background-color: var(--color-bg);
+    }
+
+    .pod-card.exposed-unready {
+      border-color: var(--color-danger);
+      background-color: rgba(226, 75, 74, 0.06);
+    }
+
+    .pod-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .pod-title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      flex-shrink: 0;
+    }
+
+    .status-dot.ready {
+      background-color: var(--color-ready);
+    }
+
+    .status-dot.notready {
+      background-color: var(--color-notready);
+    }
+
+    .status-dot.danger {
+      background-color: var(--color-danger);
+    }
+
+    .status-dot.terminating {
+      background-color: var(--color-terminating);
+    }
+
+    .status-dot.pending {
+      background-color: var(--color-pending);
+    }
+
+    .status-dot.blinking {
+      animation: crashBlink 1s infinite;
+    }
+
+    @keyframes crashBlink {
+      0% { opacity: 1; }
+      50% { opacity: 0.3; }
+      100% { opacity: 1; }
+    }
+
+    .pod-name {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .pod-card.exposed-unready .pod-name {
+      color: var(--color-danger);
+    }
+
+    .pod-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 4px;
+    }
+
+    .badge {
+      padding: 2px 6px;
+      border-radius: var(--radius-pill);
+      background-color: var(--color-badge-bg);
+      color: var(--color-badge-text);
+      font-size: 11px;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+
+    .badge-status-ready {
+      background-color: rgba(29, 158, 117, 0.1);
+      color: var(--color-ready);
+    }
+
+    .badge-status-notready {
+      background-color: rgba(239, 159, 39, 0.08);
+      color: var(--color-notready);
+    }
+
+    .badge-status-pending {
+      background-color: rgba(156, 163, 175, 0.2);
+      color: var(--color-text-muted);
+    }
+
+    .badge-status-danger {
+      background-color: rgba(226, 75, 74, 0.08);
+      color: var(--color-danger);
+    }
+
+    .badge-status-terminating {
+      background-color: rgba(109, 40, 217, 0.10);
+      color: var(--color-terminating);
+    }
+
+    .badge-inservice {
+      background-color: rgba(24, 95, 165, 0.08);
+      color: var(--color-exposed);
+    }
+
+    .badge-warning {
+      background-color: rgba(226, 75, 74, 0.08);
+      color: var(--color-danger);
+      border-color: var(--color-danger);
+    }
+
+    .pod-meta {
+      display: grid;
+      grid-template-columns: auto auto;
+      row-gap: 2px;
+      column-gap: 10px;
+      font-size: 11px;
+      color: var(--color-text-muted);
+    }
+
+    .pod-meta-label {
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .pod-meta-value {
+      font-family: var(--font-mono);
+    }
+
+    .pod-detail-block {
+      margin-top: 4px;
+      font-size: 10px;
+      color: var(--color-text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .pod-detail-title {
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--color-text);
+    }
+
+    .cond-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .cond-chip {
+      padding: 1px 5px;
+      border-radius: 4px;
+      border: 1px solid var(--color-border);
+      background-color: var(--color-surface);
+      font-family: var(--font-mono);
+      font-size: 10px;
+    }
+
+    .cond-chip.ok {
+      border-color: rgba(29, 158, 117, 0.4);
+      color: var(--color-ready);
+    }
+
+    .cond-chip.bad {
+      border-color: rgba(226, 75, 74, 0.4);
+      color: var(--color-danger);
+    }
+
+    .endpoint-row {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      line-height: 1.35;
+    }
+
+    .ep-chips {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .ep-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 1px 6px;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--color-border);
+      background-color: var(--color-surface);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      line-height: 1.3;
+    }
+
+    .ep-chip .ep-k {
+      color: var(--color-text-muted);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .ep-chip .ep-v {
+      font-weight: 600;
+    }
+
+    .ep-chip--ok {
+      border-color: rgba(29, 158, 117, 0.45);
+      color: var(--color-ready);
+    }
+
+    .ep-chip--bad {
+      border-color: rgba(226, 75, 74, 0.45);
+      color: var(--color-danger);
+    }
+
+    .ep-chip--warn {
+      border-color: rgba(239, 159, 39, 0.45);
+      color: var(--color-notready);
+    }
+
+    .ep-chip--neutral {
+      border-color: var(--color-border);
+      color: var(--color-text-muted);
+    }
+
+    .probe-strip {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      font-size: 10px;
+    }
+
+    .probe-mini-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 5px;
+      line-height: 1.35;
+    }
+
+    .probe-cname {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--color-text);
+      margin-right: 2px;
+    }
+
+    .probe-mini {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      padding: 1px 4px;
+      border-radius: 4px;
+      border: 1px solid var(--color-border);
+      background-color: var(--color-surface);
+      cursor: default;
+    }
+
+    .probe-mini.probe-ok {
+      border-color: rgba(29, 158, 117, 0.35);
+    }
+
+    .probe-mini.probe-warn {
+      border-color: rgba(239, 159, 39, 0.45);
+    }
+
+    .probe-mini.probe-bad {
+      border-color: rgba(226, 75, 74, 0.45);
+    }
+
+    .probe-mini.probe-muted {
+      border-color: var(--color-border);
+    }
+
+    .container-block {
+      border: 1px solid var(--color-border);
+      border-radius: 4px;
+      padding: 4px 6px;
+      background-color: var(--color-surface);
+    }
+
+    .container-name {
+      font-weight: 600;
+      color: var(--color-text);
+      margin-bottom: 2px;
+    }
+
+    .probe-grid {
+      display: grid;
+      grid-template-columns: 62px 1fr;
+      gap: 2px 8px;
+      font-size: 10px;
+    }
+
+    .probe-label {
+      color: var(--color-text-muted);
+    }
+
+    .probe-val {
+      font-family: var(--font-mono);
+      word-break: break-all;
+    }
+
+    .probe-ok { color: var(--color-ready); }
+    .probe-warn { color: var(--color-notready); }
+    .probe-bad { color: var(--color-danger); }
+    .probe-muted { color: var(--color-text-muted); }
+
+    .details-toggle {
+      border: 1px solid var(--color-border);
+      border-radius: 4px;
+      background-color: var(--color-surface);
+      padding: 2px 6px;
+    }
+
+    .details-toggle > summary {
+      cursor: pointer;
+      user-select: none;
+      font-size: 10px;
+      color: var(--color-text-muted);
+    }
+
+    .details-body {
+      margin-top: 6px;
+      border-top: 1px solid var(--color-border);
+      padding-top: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .envoy-section {
+      margin-top: 16px;
+      border-radius: var(--radius-base);
+      border: 1px solid var(--color-border);
+      background: var(--color-surface);
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .envoy-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+    .envoy-body {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 12px;
+      font-size: 13px;
+      color: var(--color-text-muted);
+    }
+    .envoy-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.04);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .envoy-pill-label {
+      font-weight: 500;
+      color: var(--color-text);
+    }
+    .envoy-pill-danger {
+      border-color: var(--color-danger);
+      background: rgba(220, 38, 38, 0.06);
+      color: var(--color-danger);
+    }
+    .envoy-pill-warn {
+      border-color: var(--color-notready);
+      background: rgba(245, 158, 11, 0.06);
+      color: var(--color-notready);
+    }
+    .envoy-pill-ok {
+      border-color: var(--color-ready);
+      background: rgba(16, 185, 129, 0.06);
+      color: var(--color-ready);
+    }
+
+    .events-section {
+      background-color: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-base);
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+      min-height: 220px;
+    }
+
+    .events-header {
+      font-size: 12px;
+      font-weight: 500;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--color-text-muted);
+    }
+
+    .events-list {
+      flex: 1;
+      overflow-y: auto;
+      border-radius: 4px;
+      border: 1px solid var(--color-border);
+      background-color: var(--color-bg);
+      font-size: 11px;
+    }
+
+    .event-row {
+      display: grid;
+      grid-template-columns: 70px 190px 1fr;
+      gap: 8px;
+      padding: 4px 8px;
+      align-items: baseline;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.4);
+      cursor: pointer;
+    }
+
+    .event-row:last-child {
+      border-bottom: none;
+    }
+
+    .event-time {
+      font-family: var(--font-mono);
+      color: var(--color-text-muted);
+      white-space: nowrap;
+    }
+
+    .event-pod {
+      font-family: var(--font-mono);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--color-text-muted);
+    }
+
+    .event-msg {
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      white-space: normal;
+      line-height: 1.35;
+    }
+
+    .event-row.expanded .event-msg {
+      -webkit-line-clamp: initial;
+      line-clamp: initial;
+      overflow: visible;
+    }
+
+    .event-ok {
+      color: var(--color-ready);
+    }
+
+    .event-warn {
+      color: var(--color-notready);
+    }
+
+    .event-danger {
+      color: var(--color-danger);
+    }
+
+    @media (max-width: 640px) {
+      .event-row {
+        grid-template-columns: 58px 1fr;
+        grid-template-rows: auto auto;
+        row-gap: 2px;
+      }
+      .event-pod {
+        grid-column: 2 / 3;
+      }
+      .event-msg {
+        grid-column: 1 / 3;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="top-bar">
+      <div class="top-bar-main">
+        <div class="service-chip">
+          <span id="service-health-dot" class="dot"></span>
+          <input
+            id="service-name-input"
+            class="service-name-input"
+            type="text"
+            value="sonic-interlink-triton"
+            aria-label="Service name"
+          />
+        </div>
+        <div class="top-bar-meta">
+          <div class="meta-item">
+            <span class="meta-label">Traffic</span>
+            <span id="header-risk-pill" class="risk-pill risk-pill--bad" title="" style="display:none;">
+              <span class="risk-pill-dot"></span>
+              <span id="header-risk-text">Risk 0</span>
+            </span>
+            <span id="header-issues-pill" class="risk-pill risk-pill--warn" title="" style="display:none;">
+              <span class="risk-pill-dot"></span>
+              <span id="header-issues-text">Issues 0</span>
+            </span>
+            <span id="header-ok-pill" class="risk-pill risk-pill--ok" title="" style="display:none;">
+              <span class="risk-pill-dot"></span>
+              <span>OK</span>
+            </span>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="namespace-select">
+          <span>Namespace</span>
+          <select id="namespace-select">
+            <option value="sonic" selected>sonic</option>
+            <option value="default">default</option>
+            <option value="kube-system">kube-system</option>
+          </select>
+        </div>
+        <div class="top-bar-right">
+          <div class="timer" id="global-timer">t+00:22</div>
+          <div class="last-sync" id="last-sync">Last updated: —</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="filter-buttons">
+        <button id="filter-all" class="active">All pods</button>
+        <button id="filter-ready">Ready</button>
+        <button id="filter-notready">Not ready</button>
+        <button id="filter-exposed-unready">⚠ Traffic risk</button>
+      </div>
+    </div>
+
+    <div class="envoy-section">
+      <div class="envoy-header">
+        <span>Envoy upstreams</span>
+      </div>
+      <div class="envoy-body" id="envoy-panel"></div>
+    </div>
+
+    <div class="envoy-section">
+      <div class="envoy-header">
+        <span>Envoy Gateway</span>
+      </div>
+      <div class="envoy-body" id="envoy-gateway-panel"></div>
+    </div>
+
+    <div class="pods-section">
+      <div class="pods-header">Triton servers</div>
+      <div class="pods-grid" id="pods-grid"></div>
+    </div>
+
+    <div class="events-section">
+      <div class="events-header">
+        <span>Event log</span>
+        <span id="events-count">0 events</span>
+      </div>
+      <div class="events-list" id="events-list"></div>
+    </div>
+  </div>
+
+  <script>
+    const BACKEND_URL =
+      window.location.protocol === "file:"
+        ? "http://localhost:3000/state"
+        : "/state";
+    // --- Data model ---------------------------------------------------
+
+    const STATUS = {
+      RUNNING_READY: "running-ready",
+      RUNNING_NOTREADY: "running-notready",
+      PENDING: "pending",
+      TERMINATING: "terminating",
+      CRASHLOOP: "crashloop"
+    };
+
+    const SEVERITY = {
+      OK: "ok",
+      WARN: "warn",
+      DANGER: "danger"
+    };
+
+    const service = {
+      name: "sonic-interlink-triton",
+      namespace: "sonic",
+      clusterIP: "",
+      ports: []
+    };
+
+    const initialPods = () => [];
+    const initialEvents = () => [];
+
+    let pods = initialPods();
+    let events = initialEvents();
+
+    // Tracking of exposed+unready history for persistence.
+    let trafficRiskEverCount = 0;
+    let activeEndpointAnomalyCount = 0;
+    let activeEndpointIssueWarnCount = 0;
+    let activeEndpointIssueDangerCount = 0;
+    let lastTrafficRiskIds = new Set();
+    let seenAnomalyKeys = new Set();
+    /** Pods that currently have an EndpointSlice issue (used to suppress duplicate traffic-risk log lines). */
+    let currentEndpointAnomalyPods = new Set();
+
+    /**
+     * Only one /state fetch at a time. If polls stack up (slow Envoy kubectl), queue another pass after the
+     * current one finishes — avoids discarding every response (refreshRequestId would always be ahead).
+     */
+    let backendRefreshBusy = false;
+    let backendRefreshQueued = false;
+
+    let lastSuccessfulFetchAt = null;
+    /** When API returns 0 pods but UI still shows a previous snapshot. */
+    let syncWarning = null;
+    let lastFetchHttpError = null;
+    let lastProxySnapshot = null;
+
+    // Global tick starts at 22
+    let globalTick = 22;
+
+    // Filters
+    let activeFilter = "all";
+
+    // --- Helpers ------------------------------------------------------
+
+    function formatTick(t) {
+      const mm = String(Math.floor(t / 60)).padStart(2, "0");
+      const ss = String(t % 60).padStart(2, "0");
+      return `t+${mm}:${ss}`;
+    }
+
+    function ageTextToSeconds(ageText) {
+      if (!ageText || typeof ageText !== "string") return 0;
+      const m = ageText.trim().match(/^(\d+)\s*([smhd])$/i);
+      if (!m) return 0;
+      const n = parseInt(m[1], 10);
+      if (!Number.isFinite(n)) return 0;
+      const unit = m[2].toLowerCase();
+      if (unit === "s") return n;
+      if (unit === "m") return n * 60;
+      if (unit === "h") return n * 3600;
+      if (unit === "d") return n * 86400;
+      return 0;
+    }
+
+    function appendEvent(podName, msg, severity) {
+      const time = formatTick(globalTick);
+      events.unshift({ time, pod: podName, msg, severity });
+      // Trim if desired (keep last 200)
+      if (events.length > 200) {
+        events.length = 200;
+      }
+    }
+
+    function getStatusMeta(pod) {
+      switch (pod.status) {
+        case STATUS.RUNNING_READY:
+          return { label: "Running / Ready", cls: "badge-status-ready", dot: "ready" };
+        case STATUS.RUNNING_NOTREADY:
+          return { label: "Running / Not ready", cls: "badge-status-notready", dot: "notready" };
+        case STATUS.PENDING:
+          return { label: "Pending", cls: "badge-status-pending", dot: "pending" };
+        case STATUS.TERMINATING:
+          return { label: "Terminating", cls: "badge-status-terminating", dot: "terminating" };
+        case STATUS.CRASHLOOP:
+          return { label: "CrashLoopBackOff", cls: "badge-status-danger", dot: "danger blinking" };
+        default:
+          return { label: pod.status, cls: "", dot: "pending" };
+      }
+    }
+
+    function isPodReady(pod) {
+      return pod.status === STATUS.RUNNING_READY;
+    }
+
+    function isPodUnready(pod) {
+      return pod.status === STATUS.RUNNING_NOTREADY ||
+             pod.status === STATUS.TERMINATING ||
+             pod.status === STATUS.CRASHLOOP ||
+             pod.status === STATUS.PENDING;
+    }
+
+    function isTrafficRiskPod(pod) {
+      const unreadyButTrafficEligible = !isPodReady(pod) && pod.receivesTraffic === true;
+      const terminatingAndStillTrafficEligible =
+        pod.endpointTerminating === true &&
+        pod.receivesTraffic === true &&
+        (pod.endpointReady === true || pod.endpointServing === true);
+      return unreadyButTrafficEligible || terminatingAndStillTrafficEligible;
+    }
+
+    function trafficRiskPodsCount() {
+      return pods.filter(isTrafficRiskPod).length;
+    }
+
+    function serviceHealthy() {
+      // healthy when there are no exposed+unready pods
+      return trafficRiskPodsCount() === 0 && activeEndpointAnomalyCount === 0;
+    }
+
+    function formatProbeSpecLine(spec) {
+      if (!spec) return "—";
+      if (spec.kind === "httpGet") {
+        const path = spec.path || "/";
+        return `${spec.scheme || "HTTP"} GET ${path} port ${spec.port || "?"}`;
+      }
+      if (spec.kind === "tcpSocket") return `TCP port ${spec.port || "?"}`;
+      if (spec.kind === "exec") return `exec ${spec.commandPreview || "…"}`;
+      if (spec.kind === "grpc") return `gRPC port ${spec.port || "?"} ${spec.service || ""}`.trim();
+      return "configured";
+    }
+
+    function readinessProbeLabel(status) {
+      switch (status) {
+        case "not_configured": return { text: "No readiness probe in spec", cls: "probe-muted" };
+        case "ready_true": return { text: "Ready gate: passing (status.ready=true)", cls: "probe-ok" };
+        case "ready_false": return { text: "Ready gate: failing / not ready (status.ready=false)", cls: "probe-warn" };
+        default: return { text: "Ready gate: unknown", cls: "probe-muted" };
+      }
+    }
+
+    function startupProbeLabel(status) {
+      switch (status) {
+        case "not_configured": return { text: "No startup probe", cls: "probe-muted" };
+        case "complete": return { text: "Startup: complete (status.started=true)", cls: "probe-ok" };
+        case "in_progress": return { text: "Startup: in progress (started=false)", cls: "probe-warn" };
+        case "unknown_legacy": return { text: "Startup: cluster may not expose status.started", cls: "probe-muted" };
+        default: return { text: "Startup: unknown", cls: "probe-muted" };
+      }
+    }
+
+    function livenessProbeLabel(status) {
+      switch (status) {
+        case "not_configured": return { text: "No liveness probe", cls: "probe-muted" };
+        case "running": return { text: "Liveness context: container running", cls: "probe-ok" };
+        case "crashloop": return { text: "Liveness: CrashLoopBackOff", cls: "probe-bad" };
+        case "waiting": return { text: "Liveness context: container waiting", cls: "probe-warn" };
+        case "terminated": return { text: "Liveness context: container terminated", cls: "probe-bad" };
+        default: return { text: "Liveness: unknown", cls: "probe-muted" };
+      }
+    }
+
+    function appendProbeRow(grid, label, specLine, statusLine, statusCls) {
+      const l = document.createElement("div");
+      l.className = "probe-label";
+      l.textContent = label;
+      const v = document.createElement("div");
+      v.className = "probe-val";
+      const specEl = document.createElement("div");
+      specEl.textContent = specLine;
+      const st = document.createElement("div");
+      st.className = statusCls;
+      st.textContent = statusLine;
+      v.appendChild(specEl);
+      v.appendChild(st);
+      grid.appendChild(l);
+      grid.appendChild(v);
+    }
+
+    function appendEndpointChips(parent, pod) {
+      const wrap = document.createElement("div");
+      wrap.className = "ep-chips";
+      const title = document.createElement("span");
+      title.className = "pod-detail-title";
+      title.style.marginRight = "4px";
+      title.style.alignSelf = "center";
+      title.textContent = "Endpoint";
+      title.style.fontSize = "9px";
+      wrap.appendChild(title);
+
+      function chip(key, valText, variant, tip) {
+        const el = document.createElement("span");
+        el.className = `ep-chip ep-chip--${variant}`;
+        el.title = tip || "";
+        el.innerHTML = `<span class="ep-k">${key}</span><span class="ep-v">${valText}</span>`;
+        wrap.appendChild(el);
+      }
+
+      if (!pod.exposed) {
+        chip("slice", "absent", "neutral", "Pod not present in EndpointSlice for this Service");
+        parent.appendChild(wrap);
+        return;
+      }
+
+      chip(
+        "ready",
+        pod.endpointReady ? "T" : "F",
+        pod.endpointReady ? "ok" : "bad",
+        "EndpointSlice condition: ready"
+      );
+      chip(
+        "serve",
+        pod.endpointServing ? "T" : "F",
+        pod.endpointServing ? "ok" : "bad",
+        "EndpointSlice condition: serving"
+      );
+      chip(
+        "term",
+        pod.endpointTerminating ? "T" : "F",
+        pod.endpointTerminating ? "warn" : "ok",
+        "EndpointSlice condition: terminating"
+      );
+      parent.appendChild(wrap);
+    }
+
+    function readinessProbeMini(status) {
+      switch (status) {
+        case "not_configured":
+          return { sym: "R —", title: "Readiness: not configured in pod spec", cls: "probe-muted" };
+        case "ready_true":
+          return { sym: "R ✓", title: "Readiness: passing (container ready=true)", cls: "probe-ok" };
+        case "ready_false":
+          return { sym: "R ✗", title: "Readiness: failing / not ready (container ready=false)", cls: "probe-warn" };
+        default:
+          return { sym: "R ?", title: "Readiness: unknown", cls: "probe-muted" };
+      }
+    }
+
+    function startupProbeMini(status) {
+      switch (status) {
+        case "not_configured":
+          return { sym: "S —", title: "Startup: not configured", cls: "probe-muted" };
+        case "complete":
+          return { sym: "S ✓", title: "Startup: complete (started=true)", cls: "probe-ok" };
+        case "in_progress":
+          return { sym: "S …", title: "Startup: in progress (started=false)", cls: "probe-warn" };
+        case "unknown_legacy":
+          return { sym: "S ?", title: "Startup: API may not expose started field", cls: "probe-muted" };
+        default:
+          return { sym: "S ?", title: "Startup: unknown", cls: "probe-muted" };
+      }
+    }
+
+    function livenessProbeMini(status) {
+      switch (status) {
+        case "not_configured":
+          return { sym: "L —", title: "Liveness: not configured", cls: "probe-muted" };
+        case "running":
+          return { sym: "L ✓", title: "Liveness context: container running", cls: "probe-ok" };
+        case "crashloop":
+          return { sym: "L ✗", title: "Liveness: CrashLoopBackOff", cls: "probe-bad" };
+        case "waiting":
+          return { sym: "L …", title: "Liveness context: container waiting", cls: "probe-warn" };
+        case "terminated":
+          return { sym: "L ✗", title: "Liveness context: container terminated", cls: "probe-bad" };
+        default:
+          return { sym: "L ?", title: "Liveness: unknown", cls: "probe-muted" };
+      }
+    }
+
+    function renderProbeStrip(parent, pod) {
+      if (!Array.isArray(pod.containers) || pod.containers.length === 0) return;
+
+      const strip = document.createElement("div");
+      strip.className = "probe-strip";
+
+      const hdr = document.createElement("div");
+      hdr.className = "pod-detail-title";
+      hdr.style.fontSize = "9px";
+      hdr.textContent = "Probes";
+      strip.appendChild(hdr);
+
+      pod.containers.forEach((c) => {
+        const row = document.createElement("div");
+        row.className = "probe-mini-row";
+        if (pod.containers.length > 1) {
+          const name = document.createElement("span");
+          name.className = "probe-cname";
+          name.textContent = (c.name || "?") + ":";
+          row.appendChild(name);
+        }
+        const pr = c.probes || {};
+        const minis = [
+          readinessProbeMini(pr.readiness?.status),
+          startupProbeMini(pr.startup?.status),
+          livenessProbeMini(pr.liveness?.status)
+        ];
+        minis.forEach((m) => {
+          const s = document.createElement("span");
+          s.className = "probe-mini " + m.cls;
+          s.textContent = m.sym;
+          s.title = m.title;
+          row.appendChild(s);
+        });
+        strip.appendChild(row);
+      });
+
+      parent.appendChild(strip);
+    }
+
+    function renderPodK8sDetails(card, pod) {
+      const hasK8s =
+        pod.phase ||
+        (Array.isArray(pod.conditions) && pod.conditions.length) ||
+        (Array.isArray(pod.containers) && pod.containers.length);
+      if (!hasK8s) return null;
+
+      const block = document.createElement("div");
+      block.className = "pod-detail-block";
+      appendEndpointChips(block, pod);
+      renderProbeStrip(block, pod);
+
+      const details = document.createElement("details");
+      details.className = "details-toggle";
+      const summary = document.createElement("summary");
+      summary.textContent = "Inspect k8s details";
+      details.appendChild(summary);
+
+      const detailsBody = document.createElement("div");
+      detailsBody.className = "details-body";
+
+      const title = document.createElement("div");
+      title.className = "pod-detail-title";
+      title.textContent = "Kubernetes";
+      detailsBody.appendChild(title);
+
+      if (Array.isArray(pod.conditions) && pod.conditions.length) {
+        const cr = document.createElement("div");
+        cr.className = "cond-row";
+        pod.conditions.forEach((c) => {
+          const chip = document.createElement("span");
+          chip.className = "cond-chip";
+          const isGood = c.status === "True";
+          const isUnknown = c.status === "Unknown";
+          chip.classList.add(isGood ? "ok" : (isUnknown ? "" : "bad"));
+          const reason = c.reason ? ` ${c.reason}` : "";
+          chip.title = c.message || "";
+          chip.textContent = `${c.type}=${c.status}${reason}`;
+          cr.appendChild(chip);
+        });
+        detailsBody.appendChild(cr);
+      }
+
+      if (Array.isArray(pod.containers) && pod.containers.length) {
+        const ctTitle = document.createElement("div");
+        ctTitle.className = "pod-detail-title";
+        ctTitle.textContent = "Containers & probes";
+        detailsBody.appendChild(ctTitle);
+
+        pod.containers.forEach((c) => {
+          const wrap = document.createElement("div");
+          wrap.className = "container-block";
+
+          const cn = document.createElement("div");
+          cn.className = "container-name";
+          cn.textContent = c.name || "container";
+          wrap.appendChild(cn);
+
+          const run = document.createElement("div");
+          run.className = "probe-val probe-muted";
+          run.textContent =
+            `runtime: ${c.runtimePhase || "—"}${c.runtimeReason ? ` (${c.runtimeReason})` : ""}` +
+            (c.runtimeMessage ? ` — ${c.runtimeMessage}` : "");
+          wrap.appendChild(run);
+
+          const pg = document.createElement("div");
+          pg.className = "probe-grid";
+          const pr = c.probes || {};
+          const rs = readinessProbeLabel(pr.readiness?.status);
+          appendProbeRow(
+            pg,
+            "Readiness",
+            pr.readiness?.configured ? formatProbeSpecLine(pr.readiness.spec) : "—",
+            rs.text,
+            rs.cls
+          );
+          const ss = startupProbeLabel(pr.startup?.status);
+          appendProbeRow(
+            pg,
+            "Startup",
+            pr.startup?.configured ? formatProbeSpecLine(pr.startup.spec) : "—",
+            ss.text,
+            ss.cls
+          );
+          const ls = livenessProbeLabel(pr.liveness?.status);
+          appendProbeRow(
+            pg,
+            "Liveness",
+            pr.liveness?.configured ? formatProbeSpecLine(pr.liveness.spec) : "—",
+            ls.text,
+            ls.cls
+          );
+          wrap.appendChild(pg);
+          detailsBody.appendChild(wrap);
+        });
+      }
+      details.appendChild(detailsBody);
+      block.appendChild(details);
+      card.appendChild(block);
+      return details;
+    }
+
+    // --- Rendering ----------------------------------------------------
+
+    function renderTopBar() {
+      const serviceNameInput = document.getElementById("service-name-input");
+      const healthDot = document.getElementById("service-health-dot");
+      const timerEl = document.getElementById("global-timer");
+      const nsSelect = document.getElementById("namespace-select");
+
+      if (serviceNameInput && serviceNameInput.value !== service.name) {
+        serviceNameInput.value = service.name;
+      }
+
+      healthDot.classList.toggle("danger", !serviceHealthy());
+      timerEl.textContent = formatTick(globalTick);
+
+      const syncEl = document.getElementById("last-sync");
+      if (syncEl) {
+        syncEl.classList.remove("last-sync--warn");
+        if (lastSuccessfulFetchAt) {
+          const ago = Math.floor((Date.now() - lastSuccessfulFetchAt) / 1000);
+          const clock = new Date(lastSuccessfulFetchAt).toLocaleTimeString();
+          let line = `Last updated ${clock} · ${ago}s ago`;
+          if (syncWarning) {
+            line += ` · ${syncWarning}`;
+            syncEl.classList.add("last-sync--warn");
+          }
+          if (lastFetchHttpError) {
+            line += ` · ${lastFetchHttpError}`;
+            syncEl.classList.add("last-sync--warn");
+          }
+          syncEl.textContent = line;
+        } else {
+          syncEl.textContent =
+            lastFetchHttpError || syncWarning
+              ? `No snapshot yet · ${lastFetchHttpError || syncWarning}`
+              : "Last updated: —";
+          if (lastFetchHttpError || syncWarning) syncEl.classList.add("last-sync--warn");
+        }
+      }
+
+      // Namespace change is purely cosmetic here; this is an extension point.
+      service.namespace = nsSelect.value;
+    }
+
+    function renderAlertBanner() {
+      const riskCount = trafficRiskPodsCount();
+      const warnCount = activeEndpointIssueWarnCount;
+
+      const riskPill = document.getElementById("header-risk-pill");
+      const riskText = document.getElementById("header-risk-text");
+      const issuesPill = document.getElementById("header-issues-pill");
+      const issuesText = document.getElementById("header-issues-text");
+      const okPill = document.getElementById("header-ok-pill");
+
+      const show = (el, on) => {
+        if (!el) return;
+        el.style.display = on ? "inline-flex" : "none";
+      };
+
+      if (riskCount === 0 && warnCount === 0) {
+        show(okPill, true);
+        show(riskPill, false);
+        show(issuesPill, false);
+        if (okPill) okPill.title = "No traffic-target warnings or risks.";
+        return;
+      }
+
+      show(okPill, false);
+      show(riskPill, riskCount > 0);
+      show(issuesPill, warnCount > 0);
+
+      if (riskText) riskText.textContent = `Risk ${riskCount}`;
+      if (riskPill) {
+        riskPill.title = `${riskCount} risky pod(s): EndpointSlice can still route to unready/terminating pods (explicit ready/serving or implicit unset conditions).`;
+      }
+
+      if (issuesText) issuesText.textContent = `Warnings ${warnCount}`;
+      if (issuesPill) {
+        issuesPill.title = `${warnCount} warning-level endpoint issue(s).`;
+      }
+    }
+
+    function renderPods() {
+      const grid = document.getElementById("pods-grid");
+      let filtered = pods;
+
+      if (activeFilter === "ready") {
+        filtered = pods.filter(p => isPodReady(p));
+      } else if (activeFilter === "notready") {
+        filtered = pods.filter(p => !isPodReady(p));
+      } else if (activeFilter === "exposed-unready") {
+        filtered = pods.filter(isTrafficRiskPod);
+      }
+      filtered = [...filtered].sort(
+        (a, b) => ageTextToSeconds(b.age) - ageTextToSeconds(a.age)
+      );
+
+      grid.innerHTML = "";
+
+      filtered.forEach(pod => {
+        const statusMeta = getStatusMeta(pod);
+        const exposedUnready = isTrafficRiskPod(pod);
+
+        const card = document.createElement("div");
+        card.className = "pod-card";
+        if (exposedUnready) card.classList.add("exposed-unready");
+
+        const header = document.createElement("div");
+        header.className = "pod-header";
+
+        const title = document.createElement("div");
+        title.className = "pod-title";
+
+        const dot = document.createElement("div");
+        dot.className = "status-dot " + statusMeta.dot;
+
+        const name = document.createElement("div");
+        name.className = "pod-name";
+        name.textContent = pod.id;
+
+        title.appendChild(dot);
+        title.appendChild(name);
+        header.appendChild(title);
+
+        const badges = document.createElement("div");
+        badges.className = "pod-badges";
+
+        const statusBadge = document.createElement("span");
+        statusBadge.className = "badge " + statusMeta.cls;
+        statusBadge.textContent = statusMeta.label;
+        badges.appendChild(statusBadge);
+
+        if (exposedUnready) {
+          const warnBadge = document.createElement("span");
+          warnBadge.className = "badge badge-warning";
+          warnBadge.textContent = "⚠ traffic risk";
+          badges.appendChild(warnBadge);
+        }
+
+        const meta = document.createElement("div");
+        meta.className = "pod-meta";
+
+        function addRow(label, value) {
+          const l = document.createElement("div");
+          l.className = "pod-meta-label";
+          l.textContent = label;
+          const v = document.createElement("div");
+          v.className = "pod-meta-value";
+          v.textContent = value;
+          meta.appendChild(l);
+          meta.appendChild(v);
+        }
+
+        addRow("IP", pod.ip || "—");
+        addRow("Restarts", String(pod.restarts));
+        addRow("Age", pod.age);
+        if (pod.phase) {
+          addRow("Phase", pod.phase);
+        }
+
+        card.appendChild(header);
+        card.appendChild(badges);
+        card.appendChild(meta);
+        const detailsEl = renderPodK8sDetails(card, pod);
+
+        card.addEventListener("click", (e) => {
+          if (!detailsEl) return;
+          const clickedSummary = e.target && e.target.closest && e.target.closest("summary");
+          if (clickedSummary) return;
+          detailsEl.open = !detailsEl.open;
+        });
+
+        grid.appendChild(card);
+      });
+    }
+
+    function renderEnvoyPanel() {
+      const panel = document.getElementById("envoy-panel");
+      if (!panel) return;
+      panel.innerHTML = "";
+
+      const ev = lastProxySnapshot && lastProxySnapshot.envoy;
+      if (!ev) {
+        const pill = document.createElement("div");
+        pill.className = "envoy-pill";
+        pill.textContent = "Envoy admin not configured";
+        panel.appendChild(pill);
+        return;
+      }
+
+      if (!ev.configured) {
+        const pill = document.createElement("div");
+        pill.className = "envoy-pill envoy-pill-warn";
+        pill.textContent = ev.hint || "Envoy admin not configured";
+        panel.appendChild(pill);
+        return;
+      }
+
+      const basePill = document.createElement("div");
+      basePill.className = "envoy-pill envoy-pill-ok";
+      const srcLabel = ev.source === "kubectl-exec"
+        ? `kubectl exec (${ev.adminNamespace || "ns"}/${ev.adminPod || "pod"})`
+        : ev.adminUrl
+          ? "HTTP admin"
+          : "admin";
+      basePill.textContent = `${srcLabel} · ${ev.clusterFilter || "cluster"} · ${ev.clusterCount != null ? ev.clusterCount + " clusters" : "clusters"}`;
+      panel.appendChild(basePill);
+
+      if (ev.serverInfo && ev.serverInfo.state) {
+        const pill = document.createElement("div");
+        const bad = ev.serverInfo.state !== "LIVE";
+        pill.className = "envoy-pill " + (bad ? "envoy-pill-warn" : "envoy-pill-ok");
+        pill.innerHTML = `<span class="envoy-pill-label">state</span> ${ev.serverInfo.state}`;
+        panel.appendChild(pill);
+      }
+
+      if (ev.readyHttpCode != null) {
+        const good = ev.readyHttpCode === 200;
+        const pill = document.createElement("div");
+        pill.className = "envoy-pill " + (good ? "envoy-pill-ok" : "envoy-pill-warn");
+        pill.innerHTML = `<span class="envoy-pill-label">/ready</span> HTTP ${ev.readyHttpCode}`;
+        panel.appendChild(pill);
+      }
+
+      if (ev.statsSummary && ev.statsSummary.rqTotal != null) {
+        const s = ev.statsSummary;
+        const err = (s.rq5xx || 0) + (s.rqTimeout || 0);
+        const errRate = s.rqTotal > 0 ? ((err / s.rqTotal) * 100).toFixed(1) : "0.0";
+        const pill = document.createElement("div");
+        const bad = err > 0 || (s.cxOverflow || 0) > 0 || (s.rqPendingOverflow || 0) > 0;
+        pill.className = "envoy-pill " + (bad ? "envoy-pill-warn" : "envoy-pill-ok");
+        pill.innerHTML =
+          `<span class="envoy-pill-label">cluster</span> ${s.clusterName || ev.clusterFilter || ""}` +
+          ` · total=${s.rqTotal}` +
+          ` · 5xx=${s.rq5xx || 0}` +
+          ` · timeout=${s.rqTimeout || 0}` +
+          ` · err≈${errRate}%`;
+        panel.appendChild(pill);
+
+        if ((s.cxOverflow || 0) > 0 || (s.rqPendingOverflow || 0) > 0) {
+          const cap = document.createElement("div");
+          cap.className = "envoy-pill envoy-pill-danger";
+          cap.innerHTML =
+            `<span class="envoy-pill-label">capacity</span>` +
+            ` cx_overflow=${s.cxOverflow || 0}` +
+            ` · rq_overflow=${s.rqPendingOverflow || 0}`;
+          panel.appendChild(cap);
+        }
+      }
+
+      if (ev.error) {
+        const pill = document.createElement("div");
+        pill.className = "envoy-pill envoy-pill-danger";
+        pill.textContent = ev.error.length > 80 ? ev.error.slice(0, 78) + "…" : ev.error;
+        panel.appendChild(pill);
+      }
+    }
+
+    function renderEnvoyGatewayPanel() {
+      const panel = document.getElementById("envoy-gateway-panel");
+      if (!panel) return;
+      panel.innerHTML = "";
+
+      const eg = lastProxySnapshot && lastProxySnapshot.envoyGateway;
+      if (!eg) {
+        const pill = document.createElement("div");
+        pill.className = "envoy-pill";
+        pill.textContent = "Envoy Gateway data not in response (update backend)";
+        panel.appendChild(pill);
+        return;
+      }
+
+      if (eg.error) {
+        const pill = document.createElement("div");
+        pill.className = "envoy-pill envoy-pill-danger";
+        pill.textContent = eg.error.length > 100 ? eg.error.slice(0, 98) + "…" : eg.error;
+        panel.appendChild(pill);
+        return;
+      }
+
+      const hasAny =
+        eg.gateway ||
+        (eg.gateways && eg.gateways.length) ||
+        (eg.grpcRoutes && eg.grpcRoutes.length) ||
+        (eg.dataplane && eg.dataplane.length) ||
+        (eg.system &&
+          ((eg.system.deployments && eg.system.deployments.length) ||
+            (eg.system.podsReady && eg.system.podsReady.total)));
+
+      if (!hasAny) {
+        const pill = document.createElement("div");
+        pill.className = "envoy-pill envoy-pill-warn";
+        pill.textContent = eg.hint || "No Gateway API resources in this namespace";
+        panel.appendChild(pill);
+        return;
+      }
+
+      function appendGatewaySummary(g) {
+        if (!g) return;
+        const prog = (g.conditions || []).find((c) => c.type === "Programmed");
+        const readyC = (g.conditions || []).find((c) => c.type === "Ready");
+        const ok = prog && prog.status === "True" && readyC && readyC.status === "True";
+        const pill = document.createElement("div");
+        pill.className = "envoy-pill " + (ok ? "envoy-pill-ok" : "envoy-pill-warn");
+        pill.innerHTML =
+          `<span class="envoy-pill-label">Gateway</span> ${g.namespace}/${g.name}` +
+          ` · class ${g.className || "—"}` +
+          ` · Programmed=${prog ? prog.status : "?"}` +
+          ` · Ready=${readyC ? readyC.status : "?"}`;
+        panel.appendChild(pill);
+
+        if (g.addresses && g.addresses.length) {
+          const a = document.createElement("div");
+          a.className = "envoy-pill envoy-pill-ok";
+          a.innerHTML = `<span class="envoy-pill-label">addresses</span> ${g.addresses.join(", ")}`;
+          panel.appendChild(a);
+        }
+
+        (g.listenerStatus || []).forEach((ls) => {
+          const at = ls.attachedRoutes != null ? ls.attachedRoutes : "?";
+          const lOk = typeof at === "number" ? at > 0 : false;
+          const lp = document.createElement("div");
+          lp.className = "envoy-pill " + (lOk ? "envoy-pill-ok" : "envoy-pill-warn");
+          lp.innerHTML =
+            `<span class="envoy-pill-label">listener</span> ${ls.name || "—"} · attachedRoutes=${at}`;
+          panel.appendChild(lp);
+        });
+      }
+
+      if (eg.gateway) {
+        appendGatewaySummary(eg.gateway);
+      } else if (eg.gateways && eg.gateways.length) {
+        eg.gateways.forEach((g) => appendGatewaySummary(g));
+      }
+
+      (eg.grpcRoutes || []).forEach((r) => {
+        const flat = (r.parentConditions || []).flatMap((p) => p.conditions || []);
+        const accepted = flat.find((c) => c.type === "Accepted");
+        const ok = accepted && accepted.status === "True";
+        const backends = (r.backends || []).join(", ");
+        const pill = document.createElement("div");
+        pill.className = "envoy-pill " + (ok ? "envoy-pill-ok" : "envoy-pill-warn");
+        pill.innerHTML =
+          `<span class="envoy-pill-label">GRPCRoute</span> ${r.name}` +
+          ` · Accepted=${accepted ? accepted.status : "?"}` +
+          (backends ? ` · backends ${backends}` : "");
+        panel.appendChild(pill);
+      });
+
+      (eg.dataplane || []).forEach((d) => {
+        const ok = d.desired <= 0 || d.ready >= d.desired;
+        const pill = document.createElement("div");
+        pill.className = "envoy-pill " + (ok ? "envoy-pill-ok" : "envoy-pill-warn");
+        pill.innerHTML =
+          `<span class="envoy-pill-label">dataplane</span> ${d.name} · ready ${d.ready}/${d.desired}`;
+        panel.appendChild(pill);
+      });
+
+      if (eg.system) {
+        const pr = eg.system.podsReady;
+        if (pr && pr.total > 0) {
+          const ok = pr.ready === pr.total;
+          const pill = document.createElement("div");
+          pill.className = "envoy-pill " + (ok ? "envoy-pill-ok" : "envoy-pill-warn");
+          pill.innerHTML =
+            `<span class="envoy-pill-label">controller pods</span> ${eg.system.namespace}` +
+            ` · ready ${pr.ready}/${pr.total}`;
+          panel.appendChild(pill);
+        }
+        (eg.system.deployments || []).forEach((d) => {
+          const ok = d.desired <= 0 || d.ready >= d.desired;
+          const pill = document.createElement("div");
+          pill.className = "envoy-pill " + (ok ? "envoy-pill-ok" : "envoy-pill-warn");
+          pill.innerHTML =
+            `<span class="envoy-pill-label">ctrl deploy</span> ${d.name} · ${d.ready}/${d.desired}`;
+          panel.appendChild(pill);
+        });
+      }
+    }
+
+    function renderEvents() {
+      const list = document.getElementById("events-list");
+      const countEl = document.getElementById("events-count");
+      countEl.textContent = `${events.length} event${events.length === 1 ? "" : "s"} · ever traffic risk: ${trafficRiskEverCount} · active endpoint anomalies: ${activeEndpointAnomalyCount}`;
+
+      list.innerHTML = "";
+      events.forEach(ev => {
+        const row = document.createElement("div");
+        row.className = "event-row";
+
+        const time = document.createElement("div");
+        time.className = "event-time";
+        time.textContent = ev.time;
+
+        const pod = document.createElement("div");
+        pod.className = "event-pod";
+        pod.textContent = ev.pod;
+
+        const msg = document.createElement("div");
+        msg.className = "event-msg";
+        if (ev.severity === SEVERITY.OK) msg.classList.add("event-ok");
+        else if (ev.severity === SEVERITY.WARN) msg.classList.add("event-warn");
+        else if (ev.severity === SEVERITY.DANGER) msg.classList.add("event-danger");
+        msg.textContent = ev.msg;
+        msg.title = ev.msg;
+
+        row.appendChild(time);
+        row.appendChild(pod);
+        row.appendChild(msg);
+        list.appendChild(row);
+
+        row.addEventListener("click", () => {
+          row.classList.toggle("expanded");
+        });
+      });
+    }
+
+    function renderAll() {
+      renderTopBar();
+      renderAlertBanner();
+      renderPods();
+      renderEnvoyPanel();
+      renderEnvoyGatewayPanel();
+      renderEvents();
+      updateFilterButtons();
+    }
+
+    // --- Filters & buttons --------------------------------------------
+
+    function updateFilterButtons() {
+      const ids = ["filter-all", "filter-ready", "filter-notready", "filter-exposed-unready"];
+      ids.forEach(id => {
+        const btn = document.getElementById(id);
+        btn.classList.remove("active");
+      });
+
+      if (activeFilter === "all") document.getElementById("filter-all").classList.add("active");
+      else if (activeFilter === "ready") document.getElementById("filter-ready").classList.add("active");
+      else if (activeFilter === "notready") document.getElementById("filter-notready").classList.add("active");
+      else if (activeFilter === "exposed-unready") document.getElementById("filter-exposed-unready").classList.add("active");
+    }
+
+    // --- Global tick --------------------------------------------------
+
+    function trackTrafficRisk(podList) {
+      const current = new Set(
+        podList
+          .filter(isTrafficRiskPod)
+          .map(p => p.id)
+      );
+
+      current.forEach(id => {
+        if (!lastTrafficRiskIds.has(id)) {
+          // If this pod already has an EndpointSlice issue, don't double-log.
+          if (currentEndpointAnomalyPods.has(id)) return;
+          trafficRiskEverCount += 1;
+          appendEvent(
+            id,
+            "Pod is unready while EndpointSlice can still route to it (check ready/serving/terminating conditions).",
+            SEVERITY.DANGER
+          );
+        }
+      });
+
+      lastTrafficRiskIds = current;
+    }
+
+    function trackEndpointAnomalies(anomalies) {
+      const items = Array.isArray(anomalies) ? anomalies : [];
+      activeEndpointAnomalyCount = items.length;
+      activeEndpointIssueWarnCount = items.filter((a) => a?.severity === "warn").length;
+      activeEndpointIssueDangerCount = items.filter((a) => a?.severity !== "warn").length;
+      currentEndpointAnomalyPods = new Set(
+        items.map((a) => String(a?.pod || "")).filter((p) => p && p !== "unknown")
+      );
+      items.forEach((a) => {
+        const key = a?.key || `${a?.endpointIP || "ip"}:${a?.pod || "pod"}:${a?.msg || "msg"}`;
+        if (seenAnomalyKeys.has(key)) return;
+        seenAnomalyKeys.add(key);
+        appendEvent(
+          a?.pod || "endpoint",
+          `[endpoint issue] ${a?.msg || "Traffic-target issue detected."}`,
+          a?.severity === "warn" ? SEVERITY.WARN : SEVERITY.DANGER
+        );
+      });
+    }
+
+    async function refreshFromBackend() {
+      if (backendRefreshBusy) {
+        backendRefreshQueued = true;
+        return;
+      }
+      backendRefreshBusy = true;
+      try {
+        do {
+          backendRefreshQueued = false;
+          const nsSelect = document.getElementById("namespace-select");
+          const serviceNameInput = document.getElementById("service-name-input");
+          const namespace = nsSelect ? nsSelect.value : service.namespace || "sonic";
+          const serviceName = serviceNameInput?.value || service.name || "sonic-interlink-triton";
+
+          try {
+            const url = `${BACKEND_URL}?namespace=${encodeURIComponent(
+              namespace
+            )}&service=${encodeURIComponent(serviceName)}`;
+            const resp = await fetch(url);
+
+            if (!resp.ok) {
+              lastFetchHttpError = `HTTP ${resp.status}`;
+              renderAll();
+              continue;
+            }
+            const data = await resp.json();
+
+            if (data && data.error) {
+              lastFetchHttpError =
+                typeof data.message === "string" ? data.message : String(data.error);
+              renderAll();
+              continue;
+            }
+
+            lastFetchHttpError = null;
+
+            if (data.service) {
+              service.name = data.service.name || serviceName;
+              service.namespace = data.service.namespace || namespace;
+              service.clusterIP = data.service.clusterIP || service.clusterIP;
+            }
+
+            const incomingPods = data.pods;
+            if (Array.isArray(incomingPods)) {
+              if (incomingPods.length > 0) {
+                pods = incomingPods;
+                syncWarning = null;
+              } else if (pods.length === 0) {
+                pods = [];
+                syncWarning = null;
+              } else {
+                syncWarning = "API returned 0 pods — keeping previous snapshot";
+              }
+            }
+
+            if (Array.isArray(data.anomalies)) {
+              trackEndpointAnomalies(data.anomalies);
+            } else {
+              currentEndpointAnomalyPods = new Set();
+              activeEndpointAnomalyCount = 0;
+              activeEndpointIssueWarnCount = 0;
+              activeEndpointIssueDangerCount = 0;
+            }
+
+            // Run after endpoint anomalies are updated so we can suppress duplicates.
+            trackTrafficRisk(pods);
+
+            if (data.proxy) {
+              lastProxySnapshot = data.proxy;
+            }
+
+            lastSuccessfulFetchAt = Date.now();
+            renderAll();
+          } catch (e) {
+            lastFetchHttpError = e && e.message ? e.message : "fetch failed";
+            // eslint-disable-next-line no-console
+            console.error("Failed to refresh from backend", e);
+            renderAll();
+          }
+        } while (backendRefreshQueued);
+      } finally {
+        backendRefreshBusy = false;
+      }
+    }
+
+    function globalTickStep() {
+      globalTick += 1;
+      renderAll();
+    }
+
+    // --- Initialization -----------------------------------------------
+
+    function attachHandlers() {
+      const serviceNameInput = document.getElementById("service-name-input");
+
+      if (serviceNameInput) {
+        service.name = serviceNameInput.value;
+        serviceNameInput.addEventListener("input", () => {
+          service.name = serviceNameInput.value || "";
+        });
+      }
+
+      document.getElementById("filter-all").addEventListener("click", () => {
+        activeFilter = "all";
+        renderAll();
+      });
+      document.getElementById("filter-ready").addEventListener("click", () => {
+        activeFilter = "ready";
+        renderAll();
+      });
+      document.getElementById("filter-notready").addEventListener("click", () => {
+        activeFilter = "notready";
+        renderAll();
+      });
+      document.getElementById("filter-exposed-unready").addEventListener("click", () => {
+        activeFilter = "exposed-unready";
+        renderAll();
+      });
+
+      document.getElementById("namespace-select").addEventListener("change", () => {
+        syncWarning = "Namespace changed — waiting for fresh snapshot";
+        renderAll();
+        refreshFromBackend();
+      });
+
+    }
+
+    // TODO: connect to real data via kubectl proxy
+    //   GET /api/v1/namespaces/{ns}/pods?watch=true
+    //   GET /apis/discovery.k8s.io/v1/namespaces/{ns}/endpointslices
+
+    window.addEventListener("load", () => {
+      attachHandlers();
+      renderAll();
+      // Global 1s tick loop (clock + relative timestamps)
+      setInterval(globalTickStep, 1000);
+      // Backend refresh loop (cluster data via kubectl wrapper)
+      setInterval(refreshFromBackend, 1000);
+      // Prime from backend once at startup
+      refreshFromBackend();
+    });
+  </script>
+</body>
+</html>
