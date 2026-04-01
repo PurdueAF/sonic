@@ -1,0 +1,24 @@
+# --- service-monitor-backend (Node) -------------------------------------------
+service-monitor-backend/node_modules/
+service-monitor-backend/npm-debug.log*
+service-monitor-backend/yarn-debug.log*
+service-monitor-backend/yarn-error.log*
+service-monitor-backend/pnpm-debug.log*
+# Local env (kubectl context hints, ENVOY_ADMIN_URL, ports, etc.)
+service-monitor-backend/.env
+service-monitor-backend/.env.*
+!service-monitor-backend/.env.example
+# Runtime / tooling
+service-monitor-backend/.npm/
+service-monitor-backend/coverage/
+service-monitor-backend/.nyc_output/
+
+# --- OS & editors -------------------------------------------------------------
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.code-workspace
