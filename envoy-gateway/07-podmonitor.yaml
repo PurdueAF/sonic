@@ -1,0 +1,13 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: envoy-gateway-proxy
+  namespace: sonic
+spec:
+  selector:
+    matchLabels:
+      gateway.envoyproxy.io/owning-gateway-name: sonic-gateway
+      gateway.envoyproxy.io/owning-gateway-namespace: sonic
+  podMetricsEndpoints:
+    - targetPort: 19001
+      path: /stats/prometheus

@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: np-sonic-gateway
+  namespace: sonic
+spec:
+  podSelector:
+    matchLabels:
+      gateway.envoyproxy.io/owning-gateway-name: sonic-gateway
+      gateway.envoyproxy.io/owning-gateway-namespace: sonic
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - port: 8001
+          protocol: TCP

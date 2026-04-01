@@ -1,0 +1,12 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: triton-grpc
+  namespace: sonic
+spec:
+  parentRefs:
+    - name: sonic-gateway
+  rules:
+    - backendRefs:
+        - name: sonic-interlink-triton
+          port: 8001

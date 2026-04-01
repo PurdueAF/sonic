@@ -1,0 +1,31 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: sonic-proxy-config
+  namespace: sonic
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyDeployment:
+        container:
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "512Mi"
+      envoyService:
+        type: LoadBalancer
+        annotations:
+          metallb.universe.tf/address-pool: geddes-private-pool
+  telemetry:
+    accessLog:
+      settings:
+        - matches:
+            - response.code >= 500 || (has(response.grpc_status) && response.grpc_status > 0)
+          sinks:
+            - type: File
+              file:
+                path: /dev/stdout

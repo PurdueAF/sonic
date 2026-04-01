@@ -1,0 +1,16 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: sonic-gateway
+  namespace: sonic
+spec:
+  gatewayClassName: envoy-gateway
+  infrastructure:
+    parametersRef:
+      group: gateway.envoyproxy.io
+      kind: EnvoyProxy
+      name: sonic-proxy-config
+  listeners:
+    - name: grpc
+      port: 8001
+      protocol: HTTP

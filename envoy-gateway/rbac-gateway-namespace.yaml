@@ -1,0 +1,58 @@
+# ClusterRole + Binding: allows the controller to create tokenreviews (required for
+# GatewayNamespace mode regardless of which namespaces are watched).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: eg-infra-manager-tokenreview
+rules:
+- apiGroups: [authentication.k8s.io]
+  resources: [tokenreviews]
+  verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: eg-infra-manager-tokenreview
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: eg-infra-manager-tokenreview
+subjects:
+- kind: ServiceAccount
+  name: envoy-gateway
+  namespace: envoy-gateway-system
+---
+# Role + Binding in sonic: allows the controller to provision proxy Deployments,
+# Services, ServiceAccounts, and ConfigMaps in the sonic namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: eg-namespaced-infra-manager
+  namespace: sonic
+rules:
+- apiGroups: [""]
+  resources: [serviceaccounts, services, configmaps]
+  verbs: [create, get, list, delete, deletecollection, patch]
+- apiGroups: [apps]
+  resources: [deployments, daemonsets]
+  verbs: [create, get, delete, deletecollection, patch]
+- apiGroups: [autoscaling, policy]
+  resources: [horizontalpodautoscalers, poddisruptionbudgets]
+  verbs: [create, get, list, delete, deletecollection, patch]
+- apiGroups: [certificates.k8s.io]
+  resources: [clustertrustbundles]
+  verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: eg-namespaced-infra-manager
+  namespace: sonic
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: eg-namespaced-infra-manager
+subjects:
+- kind: ServiceAccount
+  name: envoy-gateway
+  namespace: envoy-gateway-system
