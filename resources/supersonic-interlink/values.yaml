@@ -71,8 +71,8 @@ keda:
   minReplicaCount: 1
   maxReplicaCount: 10
   scaleUp:
-    stabilizationWindowSeconds: 60
-    periodSeconds: 30
+    stabilizationWindowSeconds: 120
+    periodSeconds: 15
     stepsize: 1
   scaleDown:
     stabilizationWindowSeconds: 45
