@@ -6,6 +6,8 @@ triton:
   command: ["/bin/sh", "-c"]
   args:
     - |
+      export GRPC_VERBOSITY=INFO
+      export GRPC_TRACE=tcp,connectivity_state
       /opt/tritonserver/bin/tritonserver \
       --model-repository=/cvmfs/cms.cern.ch/el9_amd64_gcc13/cms/cmssw/CMSSW_16_0_0_pre4/external/el9_amd64_gcc13/data/RecoBTag/Combined/data/models/ \
       --model-repository=/cvmfs/cms.cern.ch/el9_amd64_gcc13/cms/cmssw/CMSSW_16_0_0_pre4/external/el9_amd64_gcc13/data/RecoTauTag/TrainingFiles/data/DeepTauIdSONIC/ \
