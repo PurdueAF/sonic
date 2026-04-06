@@ -4,6 +4,14 @@ metadata:
   name: sonic-proxy-config
   namespace: sonic
 spec:
+  # Data-plane (Envoy) logs — connection/upstream/http help debug UC / upstream resets.
+  logging:
+    level:
+      default: info
+      connection: debug
+      upstream: debug
+      http: debug
+      router: info
   provider:
     type: Kubernetes
     kubernetes:
