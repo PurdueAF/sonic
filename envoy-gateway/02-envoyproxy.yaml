@@ -4,13 +4,13 @@ metadata:
   name: sonic-proxy-config
   namespace: sonic
 spec:
-  # Data-plane (Envoy) logs — connection/upstream/http help debug UC / upstream resets.
+  # Data-plane: connection + upstream debug for UC / remote close; http debug is very noisy (flow control).
   logging:
     level:
       default: info
       connection: debug
       upstream: debug
-      http: debug
+      http: warn
       router: info
   provider:
     type: Kubernetes

@@ -7,13 +7,6 @@ data:
   envoy-gateway.yaml: |
     apiVersion: gateway.envoyproxy.io/v1alpha1
     kind: EnvoyGateway
-    # Control-plane (envoy-gateway deployment) logs — xDS / translation issues.
-    logging:
-      level:
-        default: info
-        gateway-api: debug
-        xds-translator: debug
-        xds-server: debug
     provider:
       type: Kubernetes
       kubernetes:

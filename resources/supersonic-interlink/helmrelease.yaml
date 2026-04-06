@@ -22,3 +22,29 @@ spec:
     - kind: ConfigMap
       name: supersonic-interlink-config
       valuesKey: values.yaml
+  # Helm chart has no triton env hook; patch rendered Deployment (container name: triton-server).
+  postRenderers:
+    - kustomize:
+        patches:
+          - patch: |-
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: sonic-interlink-triton
+                namespace: sonic
+              spec:
+                template:
+                  spec:
+                    containers:
+                      - name: triton-server
+                        env:
+                          - name: GRPC_VERBOSITY
+                            value: INFO
+                          - name: GRPC_TRACE
+                            value: tcp,connectivity_state
+            target:
+              group: apps
+              version: v1
+              kind: Deployment
+              name: sonic-interlink-triton
+              namespace: sonic
