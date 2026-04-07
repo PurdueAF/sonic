@@ -7,11 +7,11 @@ spec:
   # Data-plane: connection + upstream debug for UC / remote close; http debug is very noisy (flow control).
   logging:
     level:
-      default: info
+      default: warn
       connection: debug
       upstream: debug
       http: warn
-      router: info
+      router: debug
   provider:
     type: Kubernetes
     kubernetes:
