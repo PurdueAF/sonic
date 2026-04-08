@@ -86,6 +86,20 @@ const EG_GATEWAY_NAME =
 /** Envoy Gateway controller install namespace; empty = skip control-plane scrape */
 const EG_SYSTEM_NAMESPACE = (process.env.EG_SYSTEM_NAMESPACE || "envoy-gateway-system").trim();
 
+/** Explicit KEDA ScaledObject name; empty = match workload behind selected Service's Pods */
+const KEDA_SCALED_OBJECT_NAME = (process.env.KEDA_SCALED_OBJECT_NAME || "").trim();
+/** Base URL for Prometheus instant queries (overrides serverAddress from ScaledObject trigger), e.g. http://127.0.0.1:9090 */
+const PROMETHEUS_BASE_URL = (
+  process.env.PROMETHEUS_BASE_URL ||
+  process.env.PROMETHEUS_URL ||
+  ""
+).trim();
+const PROMETHEUS_QUERY_DISABLED = process.env.PROMETHEUS_QUERY_DISABLED === "1";
+const PROMETHEUS_QUERY_TIMEOUT_MS = Math.min(
+  Math.max(parseInt(process.env.PROMETHEUS_QUERY_TIMEOUT_MS || "8000", 10) || 8000, 2000),
+  30000
+);
+
 function fetchTimeoutMs(ms) {
   if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
     return AbortSignal.timeout(ms);
@@ -238,16 +252,24 @@ function pickClusterStatsFromStats(statsJson, filterSubstr) {
       entry = {
         clusterName,
         rqTotal: 0,
+        rq1xx: 0,
         rq2xx: 0,
+        rq3xx: 0,
         rq4xx: 0,
         rq5xx: 0,
         rqTimeout: 0,
         rqRetry: 0,
-        rqPendingActive: 0,
         rqPendingOverflow: 0,
+        cxTotal: 0,
+        cxActive: 0,
         cxConnectFail: 0,
         cxConnectTimeout: 0,
         cxOverflow: 0,
+        cxProtocolError: 0,
+        cxIdleTimeout: 0,
+        cxMaxDurationReached: 0,
+        cxDestroyLocal: 0,
+        cxDestroyRemote: 0,
       };
       byCluster.set(clusterName, entry);
     }
@@ -256,8 +278,14 @@ function pickClusterStatsFromStats(statsJson, filterSubstr) {
       case "upstream_rq_total":
         entry.rqTotal += v;
         break;
+      case "upstream_rq_1xx":
+        entry.rq1xx += v;
+        break;
       case "upstream_rq_2xx":
         entry.rq2xx += v;
+        break;
+      case "upstream_rq_3xx":
+        entry.rq3xx += v;
         break;
       case "upstream_rq_4xx":
         entry.rq4xx += v;
@@ -271,11 +299,14 @@ function pickClusterStatsFromStats(statsJson, filterSubstr) {
       case "upstream_rq_retry":
         entry.rqRetry += v;
         break;
-      case "upstream_rq_pending_active":
-        entry.rqPendingActive += v;
-        break;
       case "upstream_rq_pending_overflow":
         entry.rqPendingOverflow += v;
+        break;
+      case "upstream_cx_total":
+        entry.cxTotal += v;
+        break;
+      case "upstream_cx_active":
+        entry.cxActive = v;
         break;
       case "upstream_cx_connect_fail":
         entry.cxConnectFail += v;
@@ -285,6 +316,21 @@ function pickClusterStatsFromStats(statsJson, filterSubstr) {
         break;
       case "upstream_cx_overflow":
         entry.cxOverflow += v;
+        break;
+      case "upstream_cx_protocol_error":
+        entry.cxProtocolError += v;
+        break;
+      case "upstream_cx_idle_timeout":
+        entry.cxIdleTimeout += v;
+        break;
+      case "upstream_cx_max_duration_reached":
+        entry.cxMaxDurationReached += v;
+        break;
+      case "upstream_cx_destroy_local":
+        entry.cxDestroyLocal += v;
+        break;
+      case "upstream_cx_destroy_remote":
+        entry.cxDestroyRemote += v;
         break;
       default:
         break;
@@ -541,6 +587,27 @@ function envoyHostUnhealthyReason(hostStatus) {
   const state = (hs.state || hs.eden_health_failure || "").toString();
   if (/unhealthy|degraded|draining|FAILED/i.test(state)) return state;
   return null;
+}
+
+/**
+ * Host count for the same upstream cluster we attribute stats to (prefer name from /stats).
+ */
+function pickClusterMembersFromClustersJson(raw, filterSubstr, statsClusterName) {
+  if (!raw || !filterSubstr) return null;
+  const statuses = raw.cluster_statuses;
+  if (!Array.isArray(statuses)) return null;
+  const f = filterSubstr.toLowerCase();
+  const matching = statuses.filter((c) => String(c.name || "").toLowerCase().includes(f));
+  if (matching.length === 0) return null;
+  let cl = null;
+  if (statsClusterName) {
+    cl =
+      matching.find((c) => c.name === statsClusterName) ||
+      matching.find((c) => String(c.name || "") === String(statsClusterName));
+  }
+  if (!cl) cl = matching[0];
+  const hosts = cl.host_statuses || cl.hostStatuses || [];
+  return Array.isArray(hosts) ? hosts.length : null;
 }
 
 function envoyJsonAnomalies(raw, filterSubstr) {
@@ -877,6 +944,79 @@ function statusToEnum(kubePod) {
   return "pending";
 }
 
+/** kubectl-style detail: scheduling / init / container waiting reasons (complements coarse status enum). */
+function summarizePodStatusDetail(kubePod, statusEnum) {
+  const maxLen = 120;
+  const trunc = (s) => {
+    const t = String(s || "").trim().replace(/\s+/g, " ");
+    if (!t) return "";
+    if (t.length <= maxLen) return t;
+    return `${t.slice(0, maxLen - 1)}…`;
+  };
+
+  if (
+    statusEnum === "running-ready" ||
+    statusEnum === "crashloop" ||
+    statusEnum === "terminating"
+  ) {
+    return "";
+  }
+
+  const phase = kubePod?.status?.phase || "Unknown";
+  const conds = kubePod?.status?.conditions || [];
+  const sched = conds.find((c) => c.type === "PodScheduled");
+  const readyCond = conds.find((c) => c.type === "Ready");
+  const initCS = kubePod?.status?.initContainerStatuses || [];
+  const cs = kubePod?.status?.containerStatuses || [];
+
+  if (phase === "Pending") {
+    if (sched?.status === "False" && sched.reason) {
+      const msg = sched.message ? `: ${String(sched.message).trim()}` : "";
+      return trunc(`${sched.reason}${msg}`);
+    }
+    for (const ics of initCS) {
+      const w = ics.state?.waiting;
+      if (w?.reason) return trunc(`Init:${w.reason}`);
+      const term = ics.state?.terminated;
+      if (term && term.exitCode !== 0) {
+        return trunc(`Init:${term.reason || "Error"}`);
+      }
+    }
+    for (const c of cs) {
+      const w = c.state?.waiting;
+      if (w?.reason) return trunc(w.reason);
+    }
+    return "";
+  }
+
+  if (phase === "Failed") {
+    const r = readyCond?.reason || readyCond?.message || "Failed";
+    return trunc(r);
+  }
+
+  if (phase === "Succeeded") {
+    return "";
+  }
+
+  if (phase === "Running") {
+    for (const c of cs) {
+      const w = c.state?.waiting;
+      if (w?.reason) return trunc(w.reason);
+    }
+    if (readyCond?.status === "False" && readyCond.reason) {
+      return trunc(readyCond.reason);
+    }
+    const readyN = cs.filter((c) => c.ready).length;
+    const total = cs.length;
+    if (total > 0 && readyN < total) {
+      return trunc(`${readyN}/${total} containers ready`);
+    }
+    return "";
+  }
+
+  return trunc(phase);
+}
+
 function statusToHistoryChar(statusEnum) {
   switch (statusEnum) {
     case "running-ready":
@@ -1073,9 +1213,6 @@ function buildPodDetails(p) {
       restartCount: cs?.restartCount ?? 0,
       started: cs?.started ?? null,
       image: sc.image || "",
-      runtimePhase: rt.phase,
-      runtimeReason: rt.reason,
-      runtimeMessage: (rt.message || "").slice(0, 160),
       probes: {
         readiness: { configured: readinessConfigured, spec: readinessSpec, status: readinessStatus },
         liveness: { configured: livenessConfigured, spec: livenessSpec, status: livenessStatus },
@@ -1087,10 +1224,328 @@ function buildPodDetails(p) {
   return {
     phase,
     qosClass,
+    nodeName: spec.nodeName || null,
     deletionTimestamp,
     conditions,
     containers,
   };
+}
+
+async function resolveWorkloadFromPods(namespace, podItems) {
+  if (!podItems || !podItems.length) return null;
+  const pod =
+    podItems.find((p) => p?.status?.phase === "Running") || podItems[0];
+  const refs = pod?.metadata?.ownerReferences || [];
+  const or = refs.find((r) => r.controller) || refs[0];
+  if (!or) return null;
+  if (or.kind === "StatefulSet") {
+    return { kind: "StatefulSet", name: or.name };
+  }
+  if (or.kind === "Deployment") {
+    return { kind: "Deployment", name: or.name };
+  }
+  if (or.kind === "ReplicaSet") {
+    try {
+      const rs = await kubectlJson(["get", "replicaset", or.name, "-n", namespace]);
+      const dep = (rs?.metadata?.ownerReferences || []).find((r) => r.kind === "Deployment");
+      if (dep) return { kind: "Deployment", name: dep.name };
+    } catch (_) {
+      /* ignore */
+    }
+    return null;
+  }
+  return null;
+}
+
+async function loadScaledObject(namespace, name) {
+  if (!name) return null;
+  return kubectlJsonOptional(["get", "scaledobject", name, "-n", namespace]);
+}
+
+async function loadHorizontalPodAutoscaler(namespace, name) {
+  if (!name) return null;
+  return kubectlJsonOptional(["get", "hpa", name, "-n", namespace]);
+}
+
+/** Current / desired from HPA; min/max from HPA spec when present. */
+function summarizeHpaReplicas(hpa) {
+  if (!hpa) return null;
+  const spec = hpa.spec || {};
+  const st = hpa.status || {};
+  return {
+    minReplicas: spec.minReplicas != null ? spec.minReplicas : null,
+    maxReplicas: spec.maxReplicas != null ? spec.maxReplicas : null,
+    currentReplicas: st.currentReplicas != null ? st.currentReplicas : null,
+    desiredReplicas: st.desiredReplicas != null ? st.desiredReplicas : null,
+  };
+}
+
+async function loadWorkloadScaleReplicas(namespace, ref) {
+  if (!ref?.name) return null;
+  const kind = String(ref.kind || "Deployment").toLowerCase();
+  const resource = kind === "statefulset" ? "statefulset" : "deployment";
+  const j = await kubectlJsonOptional(["get", resource, ref.name, "-n", namespace]);
+  if (!j) return null;
+  return {
+    specReplicas: j.spec?.replicas != null ? j.spec.replicas : null,
+    statusReplicas: j.status?.replicas != null ? j.status.replicas : null,
+  };
+}
+
+/** Fills currentReplicas / desiredReplicas from HPA (preferred) or workload scale. */
+async function enrichAutoscaleReplicas(out, namespace) {
+  const hpaName = out.scaledObjectStatus?.hpaName;
+  if (hpaName) {
+    const hpa = await loadHorizontalPodAutoscaler(namespace, hpaName);
+    const s = summarizeHpaReplicas(hpa);
+    if (s) {
+      if (s.currentReplicas != null) out.currentReplicas = s.currentReplicas;
+      if (s.desiredReplicas != null) out.desiredReplicas = s.desiredReplicas;
+      if (out.minReplicas == null && s.minReplicas != null) out.minReplicas = s.minReplicas;
+      if (out.maxReplicas == null && s.maxReplicas != null) out.maxReplicas = s.maxReplicas;
+      return;
+    }
+  }
+  const ref = out.scaleTargetRef;
+  if (!ref?.name) return;
+  const wr = await loadWorkloadScaleReplicas(namespace, ref);
+  if (!wr) return;
+  if (wr.statusReplicas != null) out.currentReplicas = wr.statusReplicas;
+  if (wr.specReplicas != null) out.desiredReplicas = wr.specReplicas;
+}
+
+async function findScaledObjectForWorkload(namespace, workload) {
+  const list = await kubectlJsonOptional(["get", "scaledobject", "-n", namespace]);
+  const items = list?.items || [];
+  if (!items.length) return null;
+  if (!workload?.name) return items[0];
+  const wantKind = workload.kind || "Deployment";
+  return (
+    items.find(
+      (so) =>
+        so.spec?.scaleTargetRef?.name === workload.name &&
+        (so.spec?.scaleTargetRef?.kind || "Deployment") === wantKind
+    ) ||
+    items.find((so) => so.spec?.scaleTargetRef?.name === workload.name) ||
+    null
+  );
+}
+
+function extractPrometheusTrigger(so) {
+  const triggers = so?.spec?.triggers || [];
+  const t = triggers.find((tr) => String(tr.type || "").toLowerCase() === "prometheus");
+  if (!t) return null;
+  const md = t.metadata || {};
+  return {
+    query: String(md.query || "").trim(),
+    threshold: md.threshold != null ? String(md.threshold).trim() : "",
+    activationThreshold:
+      md.activationThreshold != null ? String(md.activationThreshold).trim() : "",
+    serverAddress: String(md.serverAddress || "").trim(),
+    metricType: String(md.metricType || "").trim(),
+  };
+}
+
+function normalizePrometheusBaseUrl(addr) {
+  let u = String(addr || "").trim();
+  if (!u) return "";
+  if (!/^https?:\/\//i.test(u)) u = `http://${u}`;
+  return u.replace(/\/$/, "");
+}
+
+function parsePrometheusInstantVector(json) {
+  if (!json || json.status !== "success" || !json.data) {
+    return { value: null, series: 0, error: json?.error || null };
+  }
+  const r = json.data.result;
+  if (!Array.isArray(r) || r.length === 0) {
+    return { value: null, series: 0, error: null };
+  }
+  const nums = r
+    .map((x) => parseFloat(String(x.value?.[1] ?? "").trim()))
+    .filter((n) => !Number.isNaN(n));
+  if (nums.length === 0) {
+    return { value: null, series: r.length, error: null };
+  }
+  const value = nums.length === 1 ? nums[0] : Math.max(...nums);
+  return { value, series: r.length, error: null };
+}
+
+async function prometheusInstantQuery(baseUrl, query) {
+  const root = normalizePrometheusBaseUrl(baseUrl);
+  if (!root || !query) {
+    return { value: null, series: 0, error: !root ? "no Prometheus URL" : "empty query" };
+  }
+  const u = new URL(`${root}/api/v1/query`);
+  u.searchParams.set("query", query);
+  const res = await fetch(u.toString(), {
+    method: "GET",
+    headers: { Accept: "application/json" },
+    signal: fetchTimeoutMs(PROMETHEUS_QUERY_TIMEOUT_MS),
+  });
+  const text = await res.text();
+  let json;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    return { value: null, series: 0, error: `HTTP ${res.status}: non-JSON body` };
+  }
+  if (!res.ok) {
+    return {
+      value: null,
+      series: 0,
+      error: json?.error || `HTTP ${res.status}`,
+    };
+  }
+  return parsePrometheusInstantVector(json);
+}
+
+function summarizeScaledObjectStatus(so) {
+  const st = so?.status || {};
+  const conditions = (st.conditions || []).map((c) => ({
+    type: c.type,
+    status: c.status,
+    reason: c.reason || "",
+    message: String(c.message || "").slice(0, 220),
+  }));
+  const ready = conditions.find((c) => c.type === "Ready");
+  const active = conditions.find((c) => c.type === "Active");
+  const fallback = conditions.find((c) => c.type === "Fallback");
+  const paused = conditions.find((c) => c.type === "PausedReplication");
+  const healthy =
+    ready?.status === "True" &&
+    active?.status === "True" &&
+    (fallback == null || fallback.status === "False") &&
+    (paused == null || paused.status === "False");
+  return {
+    conditions,
+    hpaName: st.hpaName || null,
+    originalReplicaCount:
+      st.originalReplicaCount != null ? st.originalReplicaCount : null,
+    healthy: Boolean(healthy),
+  };
+}
+
+async function fetchAutoscaleSnapshot(namespace, podItems) {
+  const out = {
+    scaledObjectName: null,
+    scaleTargetRef: null,
+    minReplicas: null,
+    maxReplicas: null,
+    currentReplicas: null,
+    desiredReplicas: null,
+    scaledObjectStatus: null,
+    prometheusTrigger: null,
+    prometheusServerFromSpec: null,
+    prometheusServerUsed: null,
+    metricValue: null,
+    metricSeriesCount: null,
+    threshold: null,
+    activationThreshold: null,
+    aboveThreshold: null,
+    prometheusError: null,
+    hint: null,
+  };
+
+  try {
+    let so = null;
+    if (KEDA_SCALED_OBJECT_NAME) {
+      so = await loadScaledObject(namespace, KEDA_SCALED_OBJECT_NAME);
+      if (!so) out.hint = `ScaledObject "${KEDA_SCALED_OBJECT_NAME}" not found in ${namespace}`;
+    } else {
+      const workload = await resolveWorkloadFromPods(namespace, podItems);
+      if (!workload) {
+        out.hint = "No pods for this Service — cannot resolve Deployment/StatefulSet for KEDA.";
+      } else {
+        out.scaleTargetRef = { kind: workload.kind, name: workload.name };
+        so = await findScaledObjectForWorkload(namespace, workload);
+        if (!so) {
+          out.hint = `No ScaledObject targets ${workload.kind}/${workload.name} in ${namespace}`;
+        }
+      }
+    }
+
+    if (!so) return out;
+
+    out.scaledObjectName = so.metadata?.name || null;
+    if (!out.scaleTargetRef && so.spec?.scaleTargetRef) {
+      out.scaleTargetRef = {
+        kind: so.spec.scaleTargetRef.kind || "Deployment",
+        name: so.spec.scaleTargetRef.name || "",
+      };
+    }
+    out.minReplicas =
+      so.spec?.minReplicaCount != null ? so.spec.minReplicaCount : so.spec?.minReplicas ?? null;
+    out.maxReplicas =
+      so.spec?.maxReplicaCount != null ? so.spec?.maxReplicaCount : so.spec?.maxReplicas ?? null;
+    out.scaledObjectStatus = summarizeScaledObjectStatus(so);
+    await enrichAutoscaleReplicas(out, namespace);
+
+    const pt = extractPrometheusTrigger(so);
+    if (!pt) {
+      out.hint = out.hint || "ScaledObject has no prometheus trigger";
+      return out;
+    }
+    out.prometheusTrigger = {
+      query: pt.query,
+      threshold: pt.threshold,
+      activationThreshold: pt.activationThreshold,
+      metricType: pt.metricType || null,
+    };
+    out.threshold = pt.threshold ? parseFloat(pt.threshold) : null;
+    if (Number.isNaN(out.threshold)) out.threshold = null;
+    if (pt.activationThreshold) {
+      const a = parseFloat(pt.activationThreshold);
+      out.activationThreshold = Number.isNaN(a) ? null : a;
+    }
+    out.prometheusServerFromSpec = pt.serverAddress || null;
+    const serverUsed = PROMETHEUS_BASE_URL || pt.serverAddress;
+    out.prometheusServerUsed = normalizePrometheusBaseUrl(serverUsed) || null;
+
+    if (PROMETHEUS_QUERY_DISABLED) {
+      out.prometheusError = "queries disabled (PROMETHEUS_QUERY_DISABLED=1)";
+      return out;
+    }
+    if (!pt.query) {
+      out.prometheusError = "prometheus trigger has empty query";
+      return out;
+    }
+    if (!out.prometheusServerUsed) {
+      out.prometheusError = "no serverAddress on trigger (set PROMETHEUS_BASE_URL)";
+      return out;
+    }
+
+    const pq = await prometheusInstantQuery(serverUsed, pt.query);
+    out.metricSeriesCount = pq.series;
+    out.metricValue = pq.value;
+    out.prometheusError = pq.error;
+    if (
+      pq.value != null &&
+      out.threshold != null &&
+      typeof out.threshold === "number" &&
+      !Number.isNaN(out.threshold)
+    ) {
+      out.aboveThreshold = pq.value > out.threshold;
+    }
+  } catch (e) {
+    out.prometheusError = e.message || String(e);
+  }
+  return out;
+}
+
+function autoscaleAnomalies(autoscale) {
+  const out = [];
+  if (!autoscale || autoscale.prometheusError || autoscale.metricValue == null) return out;
+  if (autoscale.aboveThreshold === true) {
+    out.push({
+      key: "keda:prometheus:above-threshold",
+      severity: "warn",
+      endpointIP: "",
+      pod: "keda",
+      msg: `KEDA Prometheus load ${autoscale.metricValue} exceeds threshold ${autoscale.threshold} (ScaledObject ${autoscale.scaledObjectName || "?"})`,
+    });
+  }
+  return out;
 }
 
 // Simple CORS to allow opening the HTML from file:// or another port.
@@ -1107,9 +1562,21 @@ app.get("/", (req, res) => {
   res.sendFile(htmlPath);
 });
 
+function resolveReleaseAndK8sService(queryService) {
+  let raw = String(queryService || "").trim();
+  if (!raw) raw = "sonic-interlink";
+  const k8sService = raw.endsWith("-triton") ? raw : `${raw}-triton`;
+  const release = k8sService.endsWith("-triton")
+    ? k8sService.slice(0, -"-triton".length)
+    : k8sService;
+  return { release, k8sService };
+}
+
 app.get("/state", async (req, res) => {
   const namespace = req.query.namespace || "sonic";
-  const serviceName = req.query.service || "sonic-interlink-triton";
+  const { release: releaseName, k8sService: serviceName } = resolveReleaseAndK8sService(
+    req.query.service
+  );
 
   try {
     const svc = await kubectlJson(["get", "service", serviceName, "-n", namespace]);
@@ -1199,9 +1666,11 @@ app.get("/state", async (req, res) => {
       return {
         id: p?.metadata?.name || "",
         status: statusEnum,
+        statusDetail: summarizePodStatusDetail(p, statusEnum),
         exposed: endpointAgg.present,
         phase: k8s.phase,
         qosClass: k8s.qosClass || null,
+        nodeName: k8s.nodeName || null,
         deletionTimestamp: k8s.deletionTimestamp,
         conditions: k8s.conditions,
         containers: k8s.containers,
@@ -1285,12 +1754,14 @@ app.get("/state", async (req, res) => {
     );
 
     const envoyFilter = ENVOY_CLUSTER_FILTER || serviceName;
-    const [envoy, envoyGateway] = await Promise.all([
+    const [envoy, envoyGateway, autoscale] = await Promise.all([
       fetchEnvoySnapshotForState(namespace),
       fetchEnvoyGatewaySnapshot(namespace),
+      fetchAutoscaleSnapshot(namespace, podsJson.items || []),
     ]);
 
     anomalies.push(...envoyGatewayAnomalies(envoyGateway));
+    anomalies.push(...autoscaleAnomalies(autoscale));
 
     if (envoy.configured) {
       if (envoy.error) {
@@ -1369,7 +1840,16 @@ app.get("/state", async (req, res) => {
             error: envoy.error || null,
             serverInfo: envoy.serverInfo || null,
             readyHttpCode: envoy.readyHttpCode,
-            statsSummary: envoy.statsRaw ? pickClusterStatsFromStats(envoy.statsRaw, envoyFilter) : null,
+            statsSummary: (() => {
+              if (!envoy.statsRaw) return null;
+              const sum = pickClusterStatsFromStats(envoy.statsRaw, envoyFilter);
+              if (!sum) return null;
+              const upstreamMemberCount =
+                envoy.format === "json" && envoy.raw
+                  ? pickClusterMembersFromClustersJson(envoy.raw, envoyFilter, sum.clusterName)
+                  : null;
+              return { ...sum, upstreamMemberCount };
+            })(),
           }
         : {
             configured: false,
@@ -1380,6 +1860,7 @@ app.get("/state", async (req, res) => {
 
     res.json({
       service: {
+        release: releaseName,
         name: svc?.metadata?.name || serviceName,
         namespace: svc?.metadata?.namespace || namespace,
         clusterIP: svc?.spec?.clusterIP || "",
@@ -1389,6 +1870,7 @@ app.get("/state", async (req, res) => {
       endpoints: endpointRecords,
       anomalies,
       events: [],
+      autoscale,
       proxy,
     });
   } catch (err) {
@@ -1403,7 +1885,7 @@ app.get("/state", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`service-monitor-backend listening on http://localhost:${PORT}`);
   console.log(
-    "Example: curl 'http://localhost:%d/state?namespace=sonic&service=sonic-interlink-triton'",
+    "Example: curl 'http://localhost:%d/state?namespace=sonic&service=sonic-interlink' (Helm release → Service …-triton)",
     PORT
   );
   if (ENVOY_ADMIN_URL) {
@@ -1429,6 +1911,11 @@ app.listen(PORT, () => {
     );
   } else {
     console.log("Envoy Gateway API: controller scrape disabled (EG_SYSTEM_NAMESPACE empty)");
+  }
+  if (PROMETHEUS_BASE_URL) {
+    console.log(`Prometheus queries: using PROMETHEUS_BASE_URL=${PROMETHEUS_BASE_URL} (overrides ScaledObject serverAddress)`);
+  } else if (PROMETHEUS_QUERY_DISABLED) {
+    console.log("Prometheus queries: disabled (PROMETHEUS_QUERY_DISABLED=1)");
   }
 });
 
