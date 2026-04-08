@@ -1,3 +1,15 @@
+# BackendTrafficPolicy for GRPCRoute triton-grpc (sonic-gateway → sonic-interlink-triton).
+#
+# Problem: Router retries were configured but ineffective because large unary gRPC
+# request bodies were not buffered — Envoy logged "retry or shadow overflow ...
+# buffering set to false" and could not replay the request after upstream reset (UC).
+#
+# Fix: requestBuffer forces the buffer filter to collect the full client request
+# before forwarding, so retries after connect/reset can resend the same bytes.
+#
+# Warning: Do not use requestBuffer for client-streaming gRPC or WebSocket; it can
+# hang waiting for end-of-stream. Triton ModelInfer used by perf jobs is unary.
+#
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: BackendTrafficPolicy
 metadata:
@@ -8,6 +20,36 @@ spec:
     - group: gateway.networking.k8s.io
       kind: GRPCRoute
       name: triton-grpc
+
+  requestBuffer:
+    limit: 32Mi
+
+  connection:
+    bufferLimit: 32Mi
+
+  timeout:
+    http:
+      requestTimeout: 3600s
+
+  retry:
+    numRetries: 8
+    retryOn:
+      triggers:
+        - connect-failure
+        - reset
+        - reset-before-request
+        - refused-stream
+        - 5xx
+        - gateway-error
+        - unavailable
+        - cancelled
+        - deadline-exceeded
+        - internal
+    perRetry:
+      backOff:
+        baseInterval: 200ms
+        maxInterval: 5s
+
   healthCheck:
     passive:
       splitExternalLocalOriginErrors: true
@@ -15,4 +57,4 @@ spec:
       consecutiveGatewayErrors: 5
       interval: 10s
       baseEjectionTime: 30s
-      maxEjectionPercent: 100
+      maxEjectionPercent: 50
