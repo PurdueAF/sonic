@@ -31,8 +31,8 @@ configMapGenerator:
 
   - name: interlink-config
     files:
-      - values.yaml=../../apps/interlink/values.yaml
-      - template_traefik.yaml=../../apps/interlink/template_traefik.yaml  
+      - values.yaml=interlink/values.yaml
+      - template_traefik.yaml=interlink/template_traefik.yaml  
 
 replacements:
   - source:
