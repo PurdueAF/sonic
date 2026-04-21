@@ -40,6 +40,9 @@ triton:
     storageType: cvmfs-pvc
     mountPath: /cvmfs
   readinessProbe:
+    exec: null
+    grpc:
+      port: 8001
     successThreshold: 3
   startupProbe:
   #   #   reset: false
