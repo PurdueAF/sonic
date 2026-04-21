@@ -9,6 +9,12 @@ resources:
   - helmrepo.yaml
   - prometheus-networkpolicy.yaml
 
+  - interlink/helmrelease.yaml
+  - interlink/cache-pvc.yaml
+  - interlink/gitrepo.yaml
+  - interlink/helmrepo.yaml
+  - interlink/rbac.yaml
+
 generatorOptions:
   disableNameSuffixHash: true
 
@@ -22,3 +28,22 @@ configMapGenerator:
   - name: supersonic-interlink-config
     files:
       - values.yaml=supersonic-interlink/values.yaml
+
+  - name: interlink-config
+    files:
+      - values.yaml=../../apps/interlink/values.yaml
+      - template_traefik.yaml=../../apps/interlink/template_traefik.yaml  
+
+replacements:
+  - source:
+      kind: ConfigMap
+      name: interlink-config
+      fieldPath: data.template_traefik\.yaml
+    targets:
+      - select:
+          kind: HelmRelease
+          name: interlink
+        fieldPaths:
+          - spec.values.virtualNode.network.customTemplate
+        options:
+          create: true
