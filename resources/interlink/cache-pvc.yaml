@@ -3,7 +3,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: interlink-cache
 spec:
-  storageClassName: ${multinode_storage_class}
+  storageClassName: geddes-standard-multinode
   accessModes: [ReadWriteMany]
   resources:
     requests:
