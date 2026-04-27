@@ -5,6 +5,7 @@ metadata:
   namespace: sonic
   annotations:
     kustomize.toolkit.fluxcd.io/prune: disabled
+    helm.sh/resource-policy: keep
 spec:
   accessModes:
     - ReadWriteMany
