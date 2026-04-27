@@ -11,6 +11,7 @@ resources:
 
   - interlink/helmrelease.yaml
   - interlink/cache-pvc.yaml
+  - interlink/munge-key-pvc.yaml
   - interlink/gitrepo.yaml
   - interlink/helmrepo.yaml
   - interlink/rbac.yaml
