@@ -74,7 +74,7 @@ metadata:
     # Traefik-specific annotations for WebSocket
     traefik.ingress.kubernetes.io/router.entrypoints: web
 spec:
-  ingressClassName: public
+  ingressClassName: traefik
   rules:
   # - host: ws-{{.Name}}.{{.WildcardDNS}}
   - host: {{.Name}}-{{.Namespace}}.{{.WildcardDNS}}
