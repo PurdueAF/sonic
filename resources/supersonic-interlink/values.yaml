@@ -6,10 +6,11 @@ triton:
   command: ["/bin/sh", "-c"]
   args:
     - |
+      # Optional extra repos (previously enabled; add as extra --model-repository=... lines before --allow-gpu-metrics):
+      # --model-repository=/cvmfs/cms.cern.ch/el9_amd64_gcc13/cms/cmssw/CMSSW_16_0_0_pre4/external/el9_amd64_gcc13/data/RecoTauTag/TrainingFiles/data/DeepTauIdSONIC/
+      # --model-repository=/cvmfs/cms.cern.ch/el9_amd64_gcc13/cms/cmssw/CMSSW_16_0_0_pre4/external/el9_amd64_gcc13/data/RecoMET/METPUSubtraction/data/models/
       /opt/tritonserver/bin/tritonserver \
       --model-repository=/cvmfs/cms.cern.ch/el9_amd64_gcc13/cms/cmssw/CMSSW_16_0_0_pre4/external/el9_amd64_gcc13/data/RecoBTag/Combined/data/models/ \
-      --model-repository=/cvmfs/cms.cern.ch/el9_amd64_gcc13/cms/cmssw/CMSSW_16_0_0_pre4/external/el9_amd64_gcc13/data/RecoTauTag/TrainingFiles/data/DeepTauIdSONIC/ \
-      --model-repository=/cvmfs/cms.cern.ch/el9_amd64_gcc13/cms/cmssw/CMSSW_16_0_0_pre4/external/el9_amd64_gcc13/data/RecoMET/METPUSubtraction/data/models/ \
       --allow-gpu-metrics=true \
       --log-verbose=0 \
       --strict-model-config=false \
@@ -25,8 +26,8 @@ triton:
       operator: Exists
   annotations:
     slurm-job.vk.io/singularity-options: "--unsquash --bind /cvmfs --no-home --compat"
-    # slurm-job.vk.io/flags: "--uid=616617 -A cms -p hammer-nodes --time=1-00:00:00" # no GPUs
-    slurm-job.vk.io/flags: "--uid=616617 -A cms -p hammer-nodes --gres=gpu:1  --time=1-00:00:00"
+    slurm-job.vk.io/flags: "--uid=616617 -A cms -p hammer-nodes --time=1-00:00:00" # no GPUs
+    # slurm-job.vk.io/flags: "--uid=616617 -A cms -p hammer-nodes --gres=gpu:1  --time=1-00:00:00"
     interlink.virtual-kubelet.io/wstunnel-timeout: "5m"
     interlink.eu/wstunnel-extra-ports: "8000:http:TCP,8001:grpc:TCP,8002:metrics:TCP"
     # slurm-job.vk.io/pre-exec: "echo \"tunneling port 8000\" \n"
