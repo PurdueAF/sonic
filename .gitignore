@@ -22,3 +22,17 @@ Thumbs.db
 .idea/
 .vscode/
 *.code-workspace
+
+failure-test-*/
+
+# --- Python -------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- CHEP 2026 experiment tooling ---------------------------------------------
+chep-2026/.pixi/
+chep-2026/.venv/
+chep-2026/.mplconfig/
+chep-2026/__pycache__/
+chep-2026/results/

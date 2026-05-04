@@ -32,7 +32,7 @@ spec:
       requestTimeout: 3600s
 
   retry:
-    numRetries: 8
+    numRetries: 3
     retryOn:
       triggers:
         - connect-failure
