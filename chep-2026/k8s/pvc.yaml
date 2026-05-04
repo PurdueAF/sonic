@@ -1,0 +1,15 @@
+# Persistent volume for experiment artifacts (trials.csv, logs, run_meta.json).
+# Set storageClassName to your cluster default or a named class (e.g. ceph, gp3).
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: chep2026-results
+  namespace: sonic
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  # storageClassName: standard

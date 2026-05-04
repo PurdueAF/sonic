@@ -1,0 +1,29 @@
+# Optional helper: Pod with the results PVC mounted at /data for kubectl cp.
+#
+#   kubectl apply -f tools-pod.yaml
+#   kubectl -n sonic wait --for=condition=Ready pod/chep2026-results-shell --timeout=60s
+#   kubectl -n sonic cp chep2026-results-shell:/data ./chep2026-pvc-download
+#   kubectl -n sonic delete pod chep2026-results-shell
+#
+apiVersion: v1
+kind: Pod
+metadata:
+  name: chep2026-results-shell
+  namespace: sonic
+spec:
+  containers:
+    - name: shell
+      image: busybox:1.36
+      command: ["sleep", "infinity"]
+      volumeMounts:
+        - name: results
+          mountPath: /data
+      resources:
+        requests:
+          cpu: "10m"
+          memory: "32Mi"
+  volumes:
+    - name: results
+      persistentVolumeClaim:
+        claimName: chep2026-results
+  restartPolicy: Never

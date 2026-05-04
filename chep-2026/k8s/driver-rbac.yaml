@@ -1,0 +1,38 @@
+# ServiceAccount + Role for the experiment driver pod (creates perf_analyzer Jobs, reads logs).
+# Namespace must match config.yaml "namespace" (default: sonic).
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chep2026-experiment-driver
+  namespace: sonic
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: chep2026-experiment-driver
+  namespace: sonic
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "delete", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: chep2026-experiment-driver
+  namespace: sonic
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: chep2026-experiment-driver
+subjects:
+  - kind: ServiceAccount
+    name: chep2026-experiment-driver
+    namespace: sonic

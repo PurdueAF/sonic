@@ -1,0 +1,18 @@
+[workspace]
+name = "chep2026"
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-arm64", "osx-64"]
+
+[dependencies]
+python = ">=3.11"
+matplotlib = ">=3.8"
+mplhep = ">=0.3.55"
+numpy = ">=1.26"
+pandas = ">=2.1"
+pyarrow = ">=14.0"
+pyyaml = ">=6.0"
+
+[tasks]
+experiment = "python scripts/run_experiment.py --where local"
+experiment-k8s = "python scripts/run_experiment.py --where k8s"
+plot = "python scripts/run_plot.py"

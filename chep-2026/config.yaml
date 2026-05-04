@@ -1,0 +1,58 @@
+# CHEP-2026: perf_analyzer gRPC :8001 to either SuperSONIC Envoy or bare Triton (per variant).
+#
+# grpc_via: triton → triton_grpc_host (or triton_grpc_host_env for Slurm)
+#           envoy → envoy_grpc_host (SuperSONIC Envoy Service, see kubectl get svc -n sonic)
+#
+# Cluster Triton image/repos: resources/cms-run3-miniaod/values.yaml,
+# resources/supersonic-interlink/values.yaml. Slurm: slurm/triton_reco_btag.sbatch.
+#
+# In-cluster driver: CHEP2026_OUTPUT_ROOT on the PVC; submit with: pixi run experiment-k8s (see k8s/).
+namespace: sonic
+model_name: particlenet_AK4_PT
+image: nvcr.io/nvidia/tritonserver:24.11-py3-sdk
+grpc_port: 8001
+
+# When a variant omits grpc_via, use this (triton | envoy).
+default_grpc_via: triton
+
+reference_triton_image: nvcr.io/nvidia/tritonserver:24.11-py3
+reco_btag_model_repo: /cvmfs/cms.cern.ch/el9_amd64_gcc13/cms/cmssw/CMSSW_16_0_0_pre4/external/el9_amd64_gcc13/data/RecoBTag/Combined/data/models/
+
+request_count: 10000
+concurrency: 1
+measurement_interval_ms: 5000
+stability_percentage: 20
+max_measurement_trials: 15
+
+resources:
+  cpu: "1"
+  memory: "16G"
+
+repeats: 1
+
+batch_sizes:
+  - 1
+  - 10
+  - 25
+  - 50
+  - 75
+  - 100
+
+variants:
+  k8s:
+    plot_label: "Bare k8s"
+    grpc_via: triton
+    triton_grpc_host: cms-run3-miniaod-triton
+    envoy_grpc_host: cms-run3-miniaod
+  interlink:
+    plot_label: "InterLink: k8s+Slurm"
+    grpc_via: triton
+    triton_grpc_host: sonic-interlink-triton
+    envoy_grpc_host: sonic-interlink
+  slurm:
+    enabled: true
+    plot_label: "Bare Slurm"
+    grpc_via: triton
+    triton_grpc_host_env: CHEP2026_SLURM_TRITON_HOST
+
+kubectl_job_timeout_seconds: 7200

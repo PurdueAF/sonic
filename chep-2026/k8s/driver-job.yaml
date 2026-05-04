@@ -1,0 +1,74 @@
+# One-off Job: orchestrates perf_analyzer Jobs and writes results to PVC.
+# Uses public python:3.12-slim-bookworm (no custom image). First run downloads kubectl + pip deps.
+# Requires pod egress to dl.k8s.io and pypi.org (or set up mirrors / an internal cache).
+#
+# From chep-2026 (applies RBAC, PVC, ConfigMaps, Job; namespace from ./config.yaml):
+#   pixi run experiment-k8s
+#   pixi run experiment-k8s --dry-run
+#
+# Manual / advanced: kubectl apply -f driver-rbac.yaml -f pvc.yaml, then refresh ConfigMaps + Job by hand.
+#
+# Copy results off the cluster: apply k8s/tools-pod.yaml, then
+#   kubectl -n sonic cp chep2026-results-shell:/data ./chep2026-pvc-download
+# Local plot: pixi run plot -- --trials ./chep2026-pvc-download/chep2026_sonic_*/trials.csv
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: chep2026-experiment-driver
+  namespace: sonic
+  labels:
+    app: chep2026-experiment-driver
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 604800
+  template:
+    metadata:
+      labels:
+        app: chep2026-experiment-driver
+    spec:
+      serviceAccountName: chep2026-experiment-driver
+      restartPolicy: Never
+      containers:
+        - name: driver
+          image: python:3.12-slim-bookworm
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/bash", "/chep/driver-entrypoint.sh"]
+          env:
+            - name: CHEP2026_OUTPUT_ROOT
+              value: /results
+            - name: CHEP2026_CONFIG
+              value: /config/config.yaml
+            # Optional: pin kubectl (default v1.29.13 in driver-entrypoint.sh)
+            # - name: KUBECTL_VERSION
+            #   value: "v1.29.13"
+            # Uncomment if config enables the slurm variant (reachable from perf_analyzer pods):
+            # - name: CHEP2026_SLURM_TRITON_HOST
+            #   value: "triton.example.com"
+          volumeMounts:
+            - name: results
+              mountPath: /results
+            - name: experiment-config
+              mountPath: /config
+              readOnly: true
+            - name: driver-code
+              mountPath: /chep
+              readOnly: true
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "512Mi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+      volumes:
+        - name: results
+          persistentVolumeClaim:
+            claimName: chep2026-results
+        - name: experiment-config
+          configMap:
+            name: chep2026-experiment-config
+        - name: driver-code
+          configMap:
+            name: chep2026-driver-code
+            defaultMode: 0555

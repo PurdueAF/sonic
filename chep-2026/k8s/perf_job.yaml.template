@@ -1,0 +1,56 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: JOB_NAME_PLACEHOLDER
+  namespace: NAMESPACE_PLACEHOLDER
+  labels:
+    app: chep2026-perf-analyzer
+    chep2026/variant: VARIANT_KEY_PLACEHOLDER
+spec:
+  parallelism: 1
+  completions: 1
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app: chep2026-perf-analyzer
+        chep2026/variant: VARIANT_KEY_PLACEHOLDER
+    spec:
+      enableServiceLinks: false
+      restartPolicy: Never
+      containers:
+        - name: perf-analyzer
+          image: IMAGE_PLACEHOLDER
+          command: ["/bin/bash"]
+          args:
+            - "-c"
+            - |
+              set -euo pipefail
+              echo "chep2026 variant=VARIANT_KEY_PLACEHOLDER batch=BATCH_PLACEHOLDER trial=TRIAL_PLACEHOLDER"
+              echo "grpc_target=GRPC_TARGET_HOST_PLACEHOLDER:GRPC_PORT_PLACEHOLDER GRPC_VIA_DESC_PLACEHOLDER"
+              exec perf_analyzer \
+                -m MODEL_NAME_PLACEHOLDER \
+                -i grpc \
+                -u GRPC_TARGET_HOST_PLACEHOLDER:GRPC_PORT_PLACEHOLDER \
+                --async \
+                -p MEASUREMENT_MS_PLACEHOLDER \
+                -s STABILITY_PCT_PLACEHOLDER \
+                -r MAX_TRIALS_PLACEHOLDER \
+                -b BATCH_PLACEHOLDER \
+                --concurrency-range=CONCURRENCY_PLACEHOLDER:CONCURRENCY_PLACEHOLDER \
+                --shape pf_points__0:2,BATCH_PLACEHOLDER \
+                --shape pf_features__1:20,BATCH_PLACEHOLDER \
+                --shape pf_mask__2:1,BATCH_PLACEHOLDER \
+                --shape sv_points__3:2,10 \
+                --shape sv_features__4:11,10 \
+                --shape sv_mask__5:1,10 \
+                --request-count=REQUEST_COUNT_PLACEHOLDER \
+                -v
+          resources:
+            requests:
+              cpu: CPU_PLACEHOLDER
+              memory: MEMORY_PLACEHOLDER
+            limits:
+              cpu: CPU_PLACEHOLDER
+              memory: MEMORY_PLACEHOLDER
