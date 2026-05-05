@@ -3,7 +3,7 @@
 Build CMS-style throughput vs latency plots from saved trial data (no Kubernetes).
 
 Uses the newest ``results/chep2026_sonic_*/trials.csv`` under the CHEP tree,
-or ``--trials path/to/trials.csv`` after copying a run off the cluster PVC.
+or ``--trials path/to/trials.csv`` (e.g. ``live-plot-runs/chep2026_live_*/trials_for_plot.csv`` from ``watch_experiment_and_plot.sh``).
 
 From the ``chep-2026`` directory after ``pixi install``::
 

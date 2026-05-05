@@ -499,6 +499,13 @@ def run_suite(cfg: dict, args: argparse.Namespace) -> Path:
     if not args.skip_preflight:
         keda_preflight(namespace)
 
+    if not args.dry_run:
+        print(
+            f"[chep2026] driver run_id={run_id} namespace={namespace} "
+            f"out_dir={out_dir} model={cfg['model_name']!r}",
+            flush=True,
+        )
+
     variants = cfg["variants"]
     batch_sizes = [int(x) for x in cfg["batch_sizes"]]
     repeats = int(cfg["repeats"])
@@ -538,14 +545,31 @@ def run_suite(cfg: dict, args: argparse.Namespace) -> Path:
                     memory=str(cfg["resources"]["memory"]),
                 )
                 if args.dry_run:
+                    print(
+                        f"[chep2026] dry-run job/{job_name} variant={variant_key!r} "
+                        f"batch={batch} trial={trial} grpc={grpc_target_host}:{cfg['grpc_port']} "
+                        f"via={grpc_via_token}",
+                        flush=True,
+                    )
                     print(manifest)
                     continue
 
+                print(
+                    f"[chep2026] starting job/{job_name} variant={variant_key!r} "
+                    f"batch={batch} trial={trial} grpc={grpc_target_host}:{cfg['grpc_port']} "
+                    f"via={grpc_via_token} plot_label={plot_labels[variant_key]!r}",
+                    flush=True,
+                )
                 delete_job(namespace, job_name)
                 apply_job(manifest)
                 started = time.time()
                 status = wait_job_terminal(namespace, job_name, timeout_s)
                 if status != "succeeded":
+                    print(
+                        f"[chep2026] job/{job_name} variant={variant_key!r} batch={batch} "
+                        f"ended status={status!r}",
+                        flush=True,
+                    )
                     log_txt = job_logs(namespace, job_name)
                     (log_dir / f"FAILED_{job_name}.log").write_text(
                         log_txt, encoding="utf-8"
@@ -575,6 +599,11 @@ def run_suite(cfg: dict, args: argparse.Namespace) -> Path:
                 }
                 rows.append(row)
                 delete_job(namespace, job_name)
+                print(
+                    f"[chep2026] finished job/{job_name} variant={variant_key!r} "
+                    f"batch={batch} status=succeeded duration_sec={row['duration_sec']}",
+                    flush=True,
+                )
 
                 df_partial = build_trial_dataframe(rows)
                 df_partial.to_csv(out_dir / "trials_partial.csv", index=False)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 from pathlib import Path
 
 import numpy as np
@@ -74,6 +75,12 @@ def plot_throughput_vs_latency(
     import mplhep as hep
 
     hep.style.use("CMS")
+    # Between CMS defaults and the previous “small” pass.
+    fs_title = 15
+    fs_label = 12
+    fs_tick = 11
+    fs_legend = 10
+    fs_batch = 10
     fig, ax = plt.subplots(figsize=(10.0, 8.0))
     colors = {
         "k8s": "#1f77b4",
@@ -116,19 +123,19 @@ def plot_throughput_vs_latency(
                 (row["throughput_mean"], row["latency_plot_mean"]),
                 textcoords="offset points",
                 xytext=(ox, oy),
-                fontsize=11,
+                fontsize=fs_batch,
                 color=c,
                 alpha=0.95,
                 zorder=3,
             )
-    ax.set_xlabel("Throughput [infer / s]")
-    ax.set_ylabel(r"Average batch latency [$\mu$s]")
-    title = "SuperSONIC with and without interLink"
+    ax.set_xlabel("Throughput [infer / s]", fontsize=fs_label)
+    ax.set_ylabel(r"Average batch latency [$\mu$s]", fontsize=fs_label)
+    title = "Single-server Triton inference with perf-analyzer clients in k8s"
     if title_suffix:
         title = f"{title}\n{title_suffix}"
-    ax.set_title(title, pad=22)
-    hep.cms.label(data=False, text="Work in progress", loc=2, ax=ax)
-    ax.legend(loc="best", frameon=True)
+    ax.set_title(title, fontsize=fs_title, pad=16)
+    ax.tick_params(axis="both", which="major", labelsize=fs_tick)
+    ax.legend(loc="best", frameon=True, fontsize=fs_legend)
     ax.grid(True, which="major", linestyle=":", alpha=0.5)
     ax.set_xlim(left=0)
     ax.set_ylim(bottom=0)
@@ -144,6 +151,11 @@ def load_trials(path: Path) -> pd.DataFrame:
     if path.suffix.lower() == ".parquet":
         df = pd.read_parquet(path)
     else:
-        df = pd.read_csv(path)
+        text = path.read_text(encoding="utf-8")
+        lines = text.splitlines()
+        hdr = next((i for i, ln in enumerate(lines) if ln.startswith("run_id,")), None)
+        if hdr is not None and hdr > 0:
+            text = "\n".join(lines[hdr:])
+        df = pd.read_csv(io.StringIO(text))
     df["latency_plot_usec"] = df.apply(latency_for_plot, axis=1)
     return df

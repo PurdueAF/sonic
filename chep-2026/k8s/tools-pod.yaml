@@ -2,7 +2,8 @@
 #
 #   kubectl apply -f tools-pod.yaml
 #   kubectl -n sonic wait --for=condition=Ready pod/chep2026-results-shell --timeout=60s
-#   kubectl -n sonic cp chep2026-results-shell:/data ./chep2026-pvc-download
+#   kubectl -n sonic exec chep2026-results-shell -- cat /data/<run>/trials.csv | awk '/^run_id,/{p=1}p' > trials.csv
+#   (Some clusters prepend a line to exec stdout; awk keeps the CSV from the real header.)
 #   kubectl -n sonic delete pod chep2026-results-shell
 #
 apiVersion: v1
