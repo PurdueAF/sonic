@@ -4,7 +4,7 @@ metadata:
   name: {{.Name}}
   namespace: {{.Namespace}}
 spec:
-  replicas: 10
+  replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/component: {{.Name}}
