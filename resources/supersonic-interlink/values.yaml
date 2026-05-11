@@ -1,4 +1,4 @@
-serverLoadThreshold: 10
+serverLoadThreshold: 50
 serverLoadMetric: 'sum (rate(nv_inference_queue_duration_us{app=~"supersonic", release=~"sonic-interlink", namespace=~"sonic"}[30s])) / sum ((rate(nv_inference_exec_count{app=~"supersonic", release=~"sonic-interlink", namespace=~"sonic"}[30s]) * 1000))'
 
 triton:
@@ -71,7 +71,7 @@ envoy:
     ingressClassName: public
 
 keda:
-  enabled: false
+  enabled: true
   minReplicaCount: 1
   maxReplicaCount: 10
   scaleUp:
