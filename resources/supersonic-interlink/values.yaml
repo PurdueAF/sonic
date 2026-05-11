@@ -64,7 +64,7 @@ envoy:
       effect: NoSchedule
   loadBalancerPolicy: "ROUND_ROBIN"
   service:
-    type: ClusterIP
+    type: LoadBalancer
   ingress:
     enabled: true
     hostName: sonic-interlink.geddes.rcac.purdue.edu
