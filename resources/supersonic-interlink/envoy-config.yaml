@@ -31,14 +31,18 @@ static_resources:
                             cluster: triton_grpc_service
                             timeout: 0s
                             retry_policy:
-                              retry_on: connect-failure,reset,reset-before-request,refused-stream,5xx,gateway-error,unavailable,cancelled,deadline-exceeded,internal
+                              retry_on: 5xx,gateway-error,reset,reset-before-request,connect-failure,refused-stream,cancelled,deadline-exceeded,internal,resource-exhausted,unavailable
                               num_retries: 10
                               retry_back_off:
                                 base_interval: 0.2s
                                 max_interval: 5s
-                http_filters:                                                                                                                                                                      
-                  - name: envoy.filters.http.router                                                                                                                                                
-                    typed_config:                                                                                                                                                                  
+                http_filters:
+                  - name: envoy.filters.http.buffer
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer
+                      max_request_bytes: 33554432
+                  - name: envoy.filters.http.router
+                    typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router                                                                                                  
                 http2_protocol_options: {}                                                                                                                                                         
   clusters:                                                                                                                                                                                        
