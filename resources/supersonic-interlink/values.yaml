@@ -71,7 +71,7 @@ envoy:
     ingressClassName: public
   external_config:
     load_from_configmap: true
-    configmap_name: "sonic-interlink-envoy-config"
+    configmap_name: "sonic-interlink-envoy-config-custom"
     configmap_key: "envoy.yaml"
 
 keda:
