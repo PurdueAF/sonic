@@ -80,11 +80,11 @@ keda:
   maxReplicaCount: 10
   scaleUp:
     stabilizationWindowSeconds: 120
-    periodSeconds: 60
+    periodSeconds: 120
     stepsize: 1
   scaleDown:
-    stabilizationWindowSeconds: 45
-    periodSeconds: 45
+    stabilizationWindowSeconds: 120
+    periodSeconds: 30
     stepsize: 1
 
 prometheus:
