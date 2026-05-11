@@ -6,11 +6,15 @@ spec:
   interval: 1m
   chart:
     spec:
-      chart: supersonic
-      version: "0.3.0"
+      # chart: supersonic
+      # version: "0.3.0"
+      # sourceRef:
+      #   kind: HelmRepository
+      #   name: fastml
+      chart: helm/supersonic
       sourceRef:
-        kind: HelmRepository
-        name: fastml
+        kind: GitRepository
+        name: supersonic
       interval: 1m
   install:
     remediation:

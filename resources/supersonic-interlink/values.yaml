@@ -64,11 +64,15 @@ envoy:
       effect: NoSchedule
   loadBalancerPolicy: "ROUND_ROBIN"
   service:
-    type: LoadBalancer
+    type: ClusterIP
   ingress:
     enabled: true
     hostName: sonic-interlink.geddes.rcac.purdue.edu
     ingressClassName: public
+  external_config:
+    load_from_configmap: true
+    configmap_name: "sonic-interlink-envoy-config"
+    configmap_key: "envoy.yaml"
 
 keda:
   enabled: true
