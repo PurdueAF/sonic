@@ -27,9 +27,15 @@ static_resources:
                       routes:                                                                                                                                                                      
                         - match:                                                                                                                                                                   
                             prefix: "/"                                                                                                                                                            
-                          route:                                                                                                                                                                   
-                            cluster: triton_grpc_service                                                                                                                                           
-                            timeout: 0s                                                                                                                                                            
+                          route:
+                            cluster: triton_grpc_service
+                            timeout: 0s
+                            retry_policy:
+                              retry_on: connect-failure,reset,reset-before-request,refused-stream,5xx,gateway-error,unavailable,cancelled,deadline-exceeded,internal
+                              num_retries: 3
+                              retry_back_off:
+                                base_interval: 0.2s
+                                max_interval: 5s
                 http_filters:                                                                                                                                                                      
                   - name: envoy.filters.http.router                                                                                                                                                
                     typed_config:                                                                                                                                                                  
