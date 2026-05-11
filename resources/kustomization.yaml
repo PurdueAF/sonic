@@ -34,6 +34,9 @@ configMapGenerator:
     files:
       - values.yaml=interlink/values.yaml
       - template_traefik.yaml=interlink/template_traefik.yaml  
+  - name: sonic-interlink-envoy-config-custom
+    files:
+      - envoy.yaml=supersonic-interlink/envoy-config.yaml
 
 replacements:
   - source:
