@@ -31,8 +31,18 @@ static_resources:
                             cluster: triton_grpc_service
                             timeout: 0s
                             retry_policy:
-                              retry_on: 5xx,gateway-error,reset,reset-before-request,connect-failure,refused-stream,cancelled,deadline-exceeded,internal,resource-exhausted,unavailable
-                              num_retries: 10
+                              retry_on: 5xx,gateway-error,reset,reset-before-request,connect-failure,refused-stream,retriable-status-codes,cancelled,deadline-exceeded,internal,resource-exhausted,unavailable
+                              num_retries: 15
+                              retriable_status_codes:
+                                - 404
+                                - 502
+                                - 503
+                                - 504
+                              retry_host_predicate:
+                                - name: envoy.retry_host_predicates.previous_hosts
+                                  typed_config:
+                                    "@type": type.googleapis.com/envoy.extensions.retry.host.previous_hosts.v3.PreviousHostsPredicate
+                              host_selection_retry_max_attempts: 10
                               retry_back_off:
                                 base_interval: 0.2s
                                 max_interval: 5s
@@ -50,6 +60,13 @@ static_resources:
       connect_timeout: 0.25s                                                                                                                                                                       
       type: STRICT_DNS                                                                                                                                                                             
       lb_policy: ROUND_ROBIN                                                                                                                                                                       
+      outlier_detection:
+        split_external_local_origin_errors: true
+        consecutive_5xx: 5
+        consecutive_gateway_failure: 5
+        interval: 10s
+        base_ejection_time: 30s
+        max_ejection_percent: 50
       http2_protocol_options: {}                                                                                                                                                                   
       load_assignment:                                                                                                                                                                             
         cluster_name: triton_grpc_service                                                                                                                                                          
