@@ -4,7 +4,7 @@ resources:
   - cms-run3-miniaod/helmrelease.yaml
   # - supersonic-dynamic/gitrepo.yaml
   # - supersonic-dynamic/helmrelease.yaml
-  # - supersonic-interlink/helmrelease.yaml
+  - supersonic-interlink/helmrelease.yaml
   - gitrepo.yaml
   - helmrepo.yaml
   - prometheus-networkpolicy.yaml
