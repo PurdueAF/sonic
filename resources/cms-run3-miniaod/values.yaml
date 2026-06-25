@@ -21,11 +21,11 @@ triton:
   resources:
     limits:
       nvidia.com/gpu: 1
-      cpu: 4
+      cpu: 8
       memory: 16G
     requests:
       nvidia.com/gpu: 1
-      cpu: 4
+      cpu: 8
       memory: 16G
   nodeSelector: { "cms-af-prod": "true" }
   tolerations:
