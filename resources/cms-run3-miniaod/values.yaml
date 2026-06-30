@@ -66,8 +66,8 @@ envoy:
       value: cms-af
       effect: NoSchedule
   loadBalancerPolicy: "ROUND_ROBIN"
-  service:
-    type: LoadBalancer
+  # service:
+  #   type: LoadBalancer
   ingress:
     enabled: true
     hostName: sonic-cms.geddes.rcac.purdue.edu
