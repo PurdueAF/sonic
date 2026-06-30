@@ -66,12 +66,12 @@ envoy:
       value: cms-af
       effect: NoSchedule
   loadBalancerPolicy: "ROUND_ROBIN"
-  # service:
-  #   type: LoadBalancer
+  service:
+    type: LoadBalancer
   ingress:
-    enabled: true
-    hostName: sonic-cms.geddes.rcac.purdue.edu
-    ingressClassName: traefik
+    enabled: false
+    # hostName: sonic-cms.geddes.rcac.purdue.edu
+    # ingressClassName: public
   rate_limiter:
     prometheus_based:
       enabled: false
