@@ -12,13 +12,13 @@ config.JobType.pluginName = 'Analysis'
 config.JobType.psetName = 'run.py'
 config.JobType.allowUndistributedCMSSW = True
 # NOTE: When changing 'numCores' also change '--threads' below !
-config.JobType.numCores = 1
-config.JobType.maxMemoryMB = 2500
+config.JobType.numCores = 2
+config.JobType.maxMemoryMB = 5000
 config.JobType.maxJobRuntimeMin = 230
 
 ### Move here all CRAB-related parameters from run.py
 ### NOTE: has to be a single line!
-config.JobType.pyCfgParams=['--threads', '1', '--tempDir', '.', '--address', 'cms-run3-miniaod.sonic.geddes.rcac.purdue.edu', '--port', '8001', '--verboseDiscovery', '--tries', '10']
+config.JobType.pyCfgParams=['--threads', '2', '--tempDir', '.', '--address', 'cms-run3-miniaod.sonic.geddes.rcac.purdue.edu', '--port', '8001', '--verboseDiscovery', '--tries', '10']
 
 config.section_("Data")
 config.Data.inputDataset = '/TTtoLNu2Q_TuneCP5_13p6TeV_powheg-pythia8/Run3Summer23DRPremix-130X_mcRun3_2023_realistic_v14-v2/AODSIM'
