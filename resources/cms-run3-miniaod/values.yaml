@@ -22,12 +22,12 @@ triton:
     limits:
       nvidia.com/gpu: 1
       # nvidia.com/mig-1g.5gb: 1
-      cpu: 2
+      cpu: 4
       memory: 16G
     requests:
       nvidia.com/gpu: 1
       # nvidia.com/mig-1g.5gb: 1
-      cpu: 2
+      cpu: 4
       memory: 16G
   nodeSelector: { "cms-af-prod": "true" }
   tolerations:
