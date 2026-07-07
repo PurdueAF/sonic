@@ -14,6 +14,17 @@ triton:
       --model-repository=/cvmfs/cms.cern.ch/el9_amd64_gcc13/cms/cmssw/CMSSW_17_0_0_pre2/external/el9_amd64_gcc13/data/RecoEgamma/EgammaPhotonProducers/data/models/ \
       --model-repository=/cvmfs/cms.cern.ch/el9_amd64_gcc13/cms/cmssw/CMSSW_17_0_0_pre2/external/el9_amd64_gcc13/data/RecoTauTag/TrainingFiles/data/DeepTauIdSONIC/ \
       --model-repository=/cvmfs/cms.cern.ch/el9_amd64_gcc13/cms/cmssw/CMSSW_17_0_0_pre2/external/el9_amd64_gcc13/data/RecoMET/METPUSubtraction/data/models/ \
+      --model-control-mode=explicit \
+      --load-model=deepmet \
+      --load-model=deeptau_2018v2p5 \
+      --load-model=particleNetFromMiniAODAK4CHSCentral \
+      --load-model=particleNetFromMiniAODAK4PuppiCentral \
+      --load-model=particleNetFromMiniAODAK4PuppiForward \
+      --load-model=particleNetFromMiniAODAK8 \
+      --load-model=particlenet_AK8_MD-2prong_PT \
+      --load-model=particlenet_AK8_MassRegression_PT \
+      --load-model=particlenet_PT \
+      --load-model=unifiedparticletransformer_AK4_V01 \
       --allow-gpu-metrics=true \
       --log-verbose=0 \
       --strict-model-config=false \
